@@ -140,6 +140,10 @@
   .obs-item{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:8px;font-size:12px;}
   .obs-meta{color:var(--ink-soft);font-size:11px;margin-bottom:4px;}
   .estado-cerrada-pill{background:#EEE;color:#777;border-color:transparent;}
+  .estado-inline{border:1px solid var(--line-strong);border-radius:12px;padding:3px 8px;font-size:11px;font-weight:600;font-family:var(--sans);cursor:pointer;}
+  .estado-inline.estado-vigente{background:var(--verde-bg);color:var(--verde);}
+  .estado-inline.estado-porvencer{background:var(--amarillo-bg);color:var(--amarillo);}
+  .estado-inline.estado-cerrada-pill{background:#EEE;color:#777;}
   .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   .dash-card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;}
   .dash-card h3{font-size:14px;margin:0 0 16px;}
@@ -252,9 +256,6 @@
             <tr>
               <th class="sortable" data-sort="nombre">Nombre <span class="sort-arrow"></span></th>
               <th class="sortable" data-sort="sector">Sector <span class="sort-arrow"></span></th>
-              <th class="sortable col-chica" data-sort="vencido">Venc. <span class="sort-arrow"></span></th>
-              <th class="sortable col-chica" data-sort="porvencer">Por venc. <span class="sort-arrow"></span></th>
-              <th class="sortable col-chica" data-sort="vigente">Vig. <span class="sort-arrow"></span></th>
               <th class="sortable" data-sort="estado">Estado <span class="sort-arrow"></span></th>
               <th>Vencimientos</th>
               <th class="col-chica">OBS</th>
@@ -578,24 +579,29 @@ function renderPersonas(){
   const estadoCls = {vencido:'estado-vencido', porvencer:'estado-porvencer', vigente:'estado-vigente'};
   const estadoPersonaCls = {Activo:'estado-vigente', Standby:'estado-porvencer', Baja:'estado-cerrada-pill'};
 
-  tbody.innerHTML = list.map(({p,vencido,porvencer,vigente,items})=>{
+  const puedeEditar = canEdit();
+  tbody.innerHTML = list.map(({p,vencido,items})=>{
     const est = p.estado || 'Activo';
     const nObs = obsDePersona(p.id).length;
+    const estadoCelda = puedeEditar
+      ? `<select class="estado-inline ${estadoPersonaCls[est]}" data-estado-persona="${p.id}">
+           <option value="Activo" ${est==='Activo'?'selected':''}>Activo</option>
+           <option value="Standby" ${est==='Standby'?'selected':''}>Standby</option>
+           <option value="Baja" ${est==='Baja'?'selected':''}>Baja</option>
+         </select>`
+      : `<span class="estado-pill ${estadoPersonaCls[est]}">${est}</span>`;
     return `
       <tr data-id="${p.id}" class="${vencido>0?'row-vencido':''}">
         <td><b>${escapeHtml(p.nombre)}</b></td>
         <td>${escapeHtml(p.sector||'—')}${p.categoria?' · '+escapeHtml(p.categoria):''}</td>
-        <td class="col-chica"><span class="num-vencido" style="font-family:var(--mono);font-weight:700;">${vencido}</span></td>
-        <td class="col-chica"><span class="num-porvencer" style="font-family:var(--mono);font-weight:700;">${porvencer}</span></td>
-        <td class="col-chica"><span class="num-vigente" style="font-family:var(--mono);font-weight:700;">${vigente}</span></td>
-        <td><span class="estado-pill ${estadoPersonaCls[est]}">${est}</span></td>
+        <td>${estadoCelda}</td>
         <td>${items.length ? `<div class="venc-lista">${items.map(it=>`<span class="venc-mini ${estadoCls[it.estado]}">${escapeHtml(it.tipo)} · ${formatDate(it.fecha)}</span>`).join('')}</div>` : '<span style="color:var(--ink-soft);">—</span>'}</td>
         <td class="col-chica"><button class="btn-obs" data-obs="${p.id}">${nObs>0?'📝 '+nObs:'📝'}</button></td>
       </tr>`;
   }).join('');
   tbody.querySelectorAll('tr[data-id]').forEach(tr=>{
     tr.addEventListener('click', (e)=>{
-      if(e.target.closest('[data-obs]')) return;
+      if(e.target.closest('[data-obs]') || e.target.closest('[data-estado-persona]')) return;
       abrirPersona(tr.dataset.id);
     });
   });
@@ -603,6 +609,18 @@ function renderPersonas(){
     btn.addEventListener('click', (e)=>{
       e.stopPropagation();
       openObsPanel(btn.dataset.obs);
+    });
+  });
+  tbody.querySelectorAll('[data-estado-persona]').forEach(sel=>{
+    sel.addEventListener('click', e=> e.stopPropagation());
+    sel.addEventListener('change', async (e)=>{
+      e.stopPropagation();
+      const p = personas.find(x=>x.id===sel.dataset.estadoPersona); if(!p) return;
+      const nuevoEstado = sel.value;
+      p.estado = nuevoEstado;
+      if(nuevoEstado!=='Baja') p.fecha_baja = null;
+      await sb.from('personas').update({ estado: p.estado, fecha_baja: p.fecha_baja }).eq('id', p.id);
+      renderPersonas();
     });
   });
   updateSortArrows();

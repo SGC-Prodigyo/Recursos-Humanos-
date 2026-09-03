@@ -110,6 +110,12 @@
   th.sortable{cursor:pointer;user-select:none;}
   th.sortable:hover{color:var(--ink);}
   .sort-arrow{font-size:9px;}
+  .btn-toggle{background:none;border:1px solid var(--line-strong);border-radius:5px;width:22px;height:22px;cursor:pointer;font-size:10px;color:var(--ink-soft);padding:0;}
+  .btn-toggle:hover{background:#EEF5FC;}
+  .venc-mini{display:inline-block;font-size:11px;font-weight:500;padding:2px 8px;border-radius:10px;white-space:nowrap;}
+  tr.fila-expandida td{background:#F7FAFD;padding:10px 12px;cursor:default;}
+  tr.fila-expandida:hover td{background:#F7FAFD;}
+  .venc-lista{display:flex;flex-wrap:wrap;gap:6px;}
   .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   .dash-card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;}
   .dash-card h3{font-size:14px;margin:0 0 16px;}
@@ -218,6 +224,8 @@
               <th class="sortable" data-sort="porvencer">Por vencer <span class="sort-arrow"></span></th>
               <th class="sortable" data-sort="vigente">Vigentes <span class="sort-arrow"></span></th>
               <th class="sortable" data-sort="estado">Estado <span class="sort-arrow"></span></th>
+              <th>Próximo vencimiento</th>
+              <th style="width:26px;"></th>
             </tr>
           </thead>
           <tbody id="personasTbody"></tbody>
@@ -417,6 +425,7 @@ function personasFiltradas(){
 
 let sortCol = 'vencido';
 let sortDir = -1; // -1 desc, 1 asc
+let expandedPersonas = new Set();
 
 /* ======================= RENDER PERSONAS (tabla) ======================= */
 function renderPersonas(){
@@ -428,11 +437,16 @@ function renderPersonas(){
   renderStats();
   let list = personasFiltradas().map(p=>{
     const docs = docsDePersona(p.id);
+    const items = docs.filter(d=>!d.no_aplica && d.fecha_vencimiento).map(d=>{
+      const tipo = tiposDocumento.find(t=>t.id===d.tipo_documento_id);
+      return { tipo: tipo?tipo.nombre:'—', fecha: d.fecha_vencimiento, estado: venceInfo(d).estado };
+    }).sort((a,b)=> a.fecha.localeCompare(b.fecha));
     return {
       p,
       vencido: docs.filter(d=>venceInfo(d).estado==='vencido').length,
       porvencer: docs.filter(d=>venceInfo(d).estado==='porvencer').length,
       vigente: docs.filter(d=>venceInfo(d).estado==='vigente').length,
+      items,
     };
   });
 
@@ -450,9 +464,13 @@ function renderPersonas(){
   if(list.length===0){ tbody.innerHTML=''; emptyMsg.classList.remove('hidden'); return; }
   emptyMsg.classList.add('hidden');
 
-  tbody.innerHTML = list.map(({p,vencido,porvencer,vigente})=>{
+  const estadoCls = {vencido:'estado-vencido', porvencer:'estado-porvencer', vigente:'estado-vigente'};
+
+  tbody.innerHTML = list.map(({p,vencido,porvencer,vigente,items})=>{
     const baja = p.activo===false;
-    return `
+    const proximo = items[0];
+    const expandido = expandedPersonas.has(p.id);
+    const filaPrincipal = `
       <tr data-id="${p.id}" class="${vencido>0?'row-vencido':''}">
         <td><b>${escapeHtml(p.nombre)}</b></td>
         <td>${escapeHtml(p.sector||'—')}${p.categoria?' · '+escapeHtml(p.categoria):''}</td>
@@ -460,10 +478,28 @@ function renderPersonas(){
         <td><span class="num-porvencer" style="font-family:var(--mono);font-weight:700;">${porvencer}</span></td>
         <td><span class="num-vigente" style="font-family:var(--mono);font-weight:700;">${vigente}</span></td>
         <td>${baja?'<span class="baja-tag">BAJA</span>':'<span class="estado-pill estado-vigente">Activo</span>'}</td>
+        <td>${proximo?`<span class="venc-mini ${estadoCls[proximo.estado]}">${escapeHtml(proximo.tipo)} · ${formatDate(proximo.fecha)}</span>`:'<span style="color:var(--ink-soft);">—</span>'}</td>
+        <td><button class="btn-toggle" data-toggle="${p.id}">${expandido?'▲':'▼'}</button></td>
       </tr>`;
+    const filaExpandida = expandido ? `
+      <tr class="fila-expandida"><td colspan="8">
+        ${items.length ? `<div class="venc-lista">${items.map(it=>`<div class="venc-mini ${estadoCls[it.estado]}">${escapeHtml(it.tipo)} · ${formatDate(it.fecha)}</div>`).join('')}</div>` : '<div style="font-size:12px;color:var(--ink-soft);">Sin vencimientos cargados.</div>'}
+      </td></tr>` : '';
+    return filaPrincipal + filaExpandida;
   }).join('');
-  tbody.querySelectorAll('tr').forEach(tr=>{
-    tr.addEventListener('click', ()=> abrirPersona(tr.dataset.id));
+  tbody.querySelectorAll('tr[data-id]').forEach(tr=>{
+    tr.addEventListener('click', (e)=>{
+      if(e.target.closest('[data-toggle]')) return;
+      abrirPersona(tr.dataset.id);
+    });
+  });
+  tbody.querySelectorAll('[data-toggle]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const id = btn.dataset.toggle;
+      if(expandedPersonas.has(id)) expandedPersonas.delete(id); else expandedPersonas.add(id);
+      renderPersonas();
+    });
   });
   updateSortArrows();
 }

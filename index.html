@@ -68,6 +68,24 @@
   .stat.stat-active{border-color:var(--brand-dark);box-shadow:0 0 0 2px rgba(11,61,110,0.15) inset;}
   .stat .n{font-family:var(--mono);font-size:24px;font-weight:600;line-height:1;}
   .stat .l{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  .stat-top{cursor:default;}
+  .top-tipo-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;}
+  .top-tipo-row .n2{font-family:var(--mono);font-weight:700;color:var(--rojo);}
+  .sector-row{cursor:pointer;border-radius:5px;padding:3px 5px;margin:0 -5px;}
+  .sector-row:hover{background:#F3F6FA;}
+  .sector-row-active{background:var(--brand-light);}
+  .cat-panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-bottom:22px;}
+  .cat-panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px;}
+  .cat-panel h4{font-size:13px;margin:0 0 10px;}
+  .cat-nums{display:flex;gap:8px;}
+  .cat-num{flex:1;text-align:center;border-radius:6px;padding:8px 4px;cursor:pointer;transition:opacity 0.15s;}
+  .cat-num:hover{opacity:0.75;}
+  .cat-num.cat-num-active{box-shadow:0 0 0 2px var(--brand-dark) inset;}
+  .cat-num .cn{font-family:var(--mono);font-size:16px;font-weight:700;}
+  .cat-num .cl{font-size:9px;text-transform:uppercase;margin-top:2px;}
+  .cat-vigente{background:var(--verde-bg);color:var(--verde);}
+  .cat-porvencer{background:var(--amarillo-bg);color:var(--amarillo);}
+  .cat-vencido{background:var(--rojo-bg);color:var(--rojo);}
 
   .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;}
   .toolbar select, .toolbar input[type=text]{font-family:var(--sans);font-size:13px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:6px;background:var(--card);color:var(--ink);}
@@ -195,6 +213,7 @@
       </div>
 
       <div class="stats" id="stats"></div>
+      <div class="cat-panels" id="catPanels"></div>
 
       <div class="tabs">
         <button class="tab-btn active" id="tabBtnListado">Listado</button>
@@ -277,7 +296,7 @@ let profile = null;
 let personas = [];
 let tiposDocumento = [];
 let documentos = [];
-let currentFilter = { buscar:'', quick:null };
+let currentFilter = { buscar:'', quick:null, sector:null };
 let personaActual = null;
 
 function canEdit(){ return profile && (profile.role === 'admin' || profile.role === 'editor'); }
@@ -391,18 +410,92 @@ function docsDePersona(personaId){
 /* ======================= STATS + FILTER ======================= */
 function renderStats(){
   const el = document.getElementById('stats');
-  const vencidos = documentos.filter(d=>venceInfo(d).estado==='vencido').length;
-  const porVencer = documentos.filter(d=>venceInfo(d).estado==='porvencer').length;
-  const vigentes = documentos.filter(d=>venceInfo(d).estado==='vigente').length;
+  const activasIds = personas.filter(p=>p.activo!==false).map(p=>p.id);
+  const docsActivos = documentos.filter(d=>activasIds.includes(d.persona_id));
+
+  const personasConVencido = personas.filter(p=> p.activo!==false && docsDePersona(p.id).some(d=>venceInfo(d).estado==='vencido')).length;
+
+  const relevantes = docsActivos.filter(d=>!d.no_aplica && d.fecha_vencimiento);
+  const vigentesN = relevantes.filter(d=>venceInfo(d).estado==='vigente').length;
+  const pctCumplimiento = relevantes.length ? Math.round((vigentesN/relevantes.length)*100) : 100;
+
+  const conteoTipo = {};
+  docsActivos.filter(d=>venceInfo(d).estado==='vencido').forEach(d=>{
+    conteoTipo[d.tipo_documento_id] = (conteoTipo[d.tipo_documento_id]||0)+1;
+  });
+  const topTipos = Object.entries(conteoTipo).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([tid,n])=>{
+    const tipo = tiposDocumento.find(t=>t.id===tid);
+    return { nombre: tipo?tipo.nombre:'—', n };
+  });
+
+  const conteoSector = {};
+  personas.filter(p=>p.activo!==false).forEach(p=>{
+    const n = docsDePersona(p.id).filter(d=>venceInfo(d).estado==='vencido').length;
+    if(n>0){
+      const sec = p.sector || 'Sin sector';
+      conteoSector[sec] = (conteoSector[sec]||0) + n;
+    }
+  });
+  const topSectores = Object.entries(conteoSector).sort((a,b)=>b[1]-a[1]).slice(0,4);
+
   const activeCls = (key) => currentFilter.quick===key ? ' stat-active' : '';
+  const pctColor = pctCumplimiento>=90 ? 'var(--verde)' : (pctCumplimiento>=70 ? 'var(--amarillo)' : 'var(--rojo)');
+
   el.innerHTML = `
-    <div class="stat clickable${activeCls('vencido')}" data-quick="vencido"><div class="n" style="color:var(--rojo);">${vencidos}</div><div class="l">Vencidos</div></div>
-    <div class="stat clickable${activeCls('porvencer')}" data-quick="porvencer"><div class="n" style="color:var(--amarillo);">${porVencer}</div><div class="l">Por vencer (30 días)</div></div>
-    <div class="stat clickable${activeCls('vigente')}" data-quick="vigente"><div class="n" style="color:var(--verde);">${vigentes}</div><div class="l">Vigentes</div></div>
-    <div class="stat"><div class="n">${personas.length}</div><div class="l">Personas</div></div>`;
+    <div class="stat clickable${activeCls('vencido')}" data-quick="vencido"><div class="n" style="color:var(--rojo);">${personasConVencido}</div><div class="l">Personas con algo vencido</div></div>
+    <div class="stat"><div class="n" style="color:${pctColor};">${pctCumplimiento}%</div><div class="l">Cumplimiento general (vigentes)</div></div>
+    <div class="stat stat-top">
+      <div class="l" style="margin-bottom:6px;">Tipos con más vencidos</div>
+      ${topTipos.length ? topTipos.map(t=>`<div class="top-tipo-row"><span>${escapeHtml(t.nombre)}</span><span class="n2">${t.n}</span></div>`).join('') : '<div style="font-size:12px;color:var(--ink-soft);">Sin vencidos 🎉</div>'}
+    </div>
+    <div class="stat stat-top clickable-list">
+      <div class="l" style="margin-bottom:6px;">Vencidos por sector</div>
+      ${topSectores.length ? topSectores.map(([sec,n])=>`<div class="top-tipo-row sector-row${currentFilter.sector===sec?' sector-row-active':''}" data-sector="${escapeHtml(sec)}"><span>${escapeHtml(sec)}</span><span class="n2">${n}</span></div>`).join('') : '<div style="font-size:12px;color:var(--ink-soft);">Sin vencidos 🎉</div>'}
+    </div>`;
   el.querySelectorAll('.stat[data-quick]').forEach(card=>{
     card.addEventListener('click', ()=>{
       const key = card.dataset.quick;
+      currentFilter.quick = (currentFilter.quick === key) ? null : key;
+      renderPersonas();
+    });
+  });
+  el.querySelectorAll('.sector-row').forEach(row=>{
+    row.addEventListener('click', ()=>{
+      const sec = row.dataset.sector;
+      currentFilter.sector = (currentFilter.sector === sec) ? null : sec;
+      renderPersonas();
+    });
+  });
+  renderCatPanels();
+}
+
+function renderCatPanels(){
+  const el = document.getElementById('catPanels');
+  const activasIds = personas.filter(p=>p.activo!==false).map(p=>p.id);
+  const docsActivos = documentos.filter(d=>activasIds.includes(d.persona_id) && !d.no_aplica && d.fecha_vencimiento);
+  const categorias = [...new Set(tiposDocumento.map(t=>t.categoria))].filter(Boolean);
+
+  el.innerHTML = categorias.map(cat=>{
+    const tipoIds = tiposDocumento.filter(t=>t.categoria===cat).map(t=>t.id);
+    const docsCat = docsActivos.filter(d=>tipoIds.includes(d.tipo_documento_id));
+    const vencido = docsCat.filter(d=>venceInfo(d).estado==='vencido').length;
+    const porvencer = docsCat.filter(d=>venceInfo(d).estado==='porvencer').length;
+    const vigente = docsCat.filter(d=>venceInfo(d).estado==='vigente').length;
+    const isActive = (est) => currentFilter.quick===`cat::${cat}::${est}`;
+    return `
+      <div class="cat-panel">
+        <h4>${escapeHtml(cat)}</h4>
+        <div class="cat-nums">
+          <div class="cat-num cat-vigente${isActive('vigente')?' cat-num-active':''}" data-cat="${escapeHtml(cat)}" data-est="vigente"><div class="cn">${vigente}</div><div class="cl">Al día</div></div>
+          <div class="cat-num cat-porvencer${isActive('porvencer')?' cat-num-active':''}" data-cat="${escapeHtml(cat)}" data-est="porvencer"><div class="cn">${porvencer}</div><div class="cl">Por vencer</div></div>
+          <div class="cat-num cat-vencido${isActive('vencido')?' cat-num-active':''}" data-cat="${escapeHtml(cat)}" data-est="vencido"><div class="cn">${vencido}</div><div class="cl">Vencidos</div></div>
+        </div>
+      </div>`;
+  }).join('');
+
+  el.querySelectorAll('.cat-num').forEach(box=>{
+    box.addEventListener('click', ()=>{
+      const key = `cat::${box.dataset.cat}::${box.dataset.est}`;
       currentFilter.quick = (currentFilter.quick === key) ? null : key;
       renderPersonas();
     });
@@ -417,8 +510,17 @@ function personasFiltradas(){
     const q = currentFilter.buscar.toLowerCase();
     list = list.filter(p => `${p.nombre} ${p.sector} ${p.categoria}`.toLowerCase().includes(q));
   }
+  if(currentFilter.sector){
+    list = list.filter(p => (p.sector||'Sin sector') === currentFilter.sector);
+  }
   if(currentFilter.quick){
-    list = list.filter(p => docsDePersona(p.id).some(d=> venceInfo(d).estado===currentFilter.quick));
+    if(currentFilter.quick.startsWith('cat::')){
+      const [, cat, est] = currentFilter.quick.split('::');
+      const tipoIds = tiposDocumento.filter(t=>t.categoria===cat).map(t=>t.id);
+      list = list.filter(p => docsDePersona(p.id).some(d=> tipoIds.includes(d.tipo_documento_id) && venceInfo(d).estado===est));
+    } else {
+      list = list.filter(p => docsDePersona(p.id).some(d=> venceInfo(d).estado===currentFilter.quick));
+    }
   }
   return list;
 }

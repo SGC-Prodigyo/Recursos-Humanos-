@@ -214,8 +214,7 @@
     <div id="view-personas" class="view hidden">
       <div class="topbar">
         <div>
-          <h1 class="pagetitle">Control de Contratistas</h1>
-          <p class="sub">Vencimientos de exámenes, cursos, EPP y accesos a sitios de cliente.</p>
+          <p class="sub" style="margin-top:6px;">Vencimientos de exámenes, cursos, EPP y accesos a sitios de cliente.</p>
         </div>
         <div class="userbox">
           <span class="role-pill" id="rolePill">...</span>
@@ -247,7 +246,7 @@
         <button class="btn btn-primary hidden" id="btnNuevaPersona">+ Nueva persona</button>
       </div>
 
-      <div class="table-wrap">
+      <div class="table-wrap" id="tableWrapNormal">
         <table>
           <thead>
             <tr>
@@ -265,6 +264,16 @@
         </table>
       </div>
       <div class="empty hidden" id="emptyMsg">Todavía no hay personas cargadas.</div>
+
+      <div id="quickListWrap" class="hidden">
+        <button class="btn" id="btnVolverQuickList" style="margin-bottom:12px;">← Volver al listado completo</button>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Persona</th><th>Documentación</th><th>Vencimiento</th></tr></thead>
+            <tbody id="quickListTbody"></tbody>
+          </table>
+        </div>
+      </div>
       </div>
 
       <div id="tab-dash" class="hidden"></div>
@@ -276,7 +285,10 @@
             <h2 id="personaDetalleTitulo" style="font-size:17px;margin:0 0 4px;"></h2>
             <p class="sub" id="personaDetalleSub" style="margin-bottom:0;"></p>
           </div>
-          <button class="btn hidden" id="btnEditarPersona">Editar datos / estado</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn hidden" id="btnEditarPersona">Editar datos / estado</button>
+            <button class="btn hidden" id="btnEliminarPersonaDirecto" style="color:var(--rojo);">Eliminar persona</button>
+          </div>
         </div>
         <div class="toolbar" style="margin-top:14px;">
           <div class="spacer"></div>
@@ -284,7 +296,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Documentación</th><th>Emisión</th><th>Vencimiento</th><th>Estado</th><th>Observaciones</th></tr></thead>
+            <thead><tr><th>Documentación</th><th>Carga</th><th>Vencimiento</th><th>Estado</th></tr></thead>
             <tbody id="tbodyDocsPersona"></tbody>
           </table>
         </div>
@@ -429,6 +441,42 @@ function docsDePersona(personaId){
 }
 
 /* ======================= STATS + FILTER ======================= */
+function renderQuickList(cat, est){
+  document.getElementById('personaDetalleLista').classList.add('hidden');
+  document.getElementById('tableWrapNormal').classList.add('hidden');
+  document.getElementById('emptyMsg').classList.add('hidden');
+  document.getElementById('quickListWrap').classList.remove('hidden');
+
+  const filtroEstado = document.getElementById('fEstadoPersona').value;
+  const tipoIds = tiposDocumento.filter(t=>t.categoria===cat).map(t=>t.id);
+  const estCls = {vigente:'estado-vigente', porvencer:'estado-porvencer', vencido:'estado-vencido'}[est];
+
+  const filas = [];
+  personas.forEach(p=>{
+    if(filtroEstado!=='todos' && (p.estado||'Activo')!==filtroEstado) return;
+    docsDePersona(p.id).forEach(d=>{
+      if(!tipoIds.includes(d.tipo_documento_id)) return;
+      if(venceInfo(d).estado !== est) return;
+      const tipo = tiposDocumento.find(t=>t.id===d.tipo_documento_id);
+      filas.push({ nombre: p.nombre, tipo: tipo?tipo.nombre:'—', fecha: d.fecha_vencimiento });
+    });
+  });
+  filas.sort((a,b)=> (a.fecha||'').localeCompare(b.fecha||''));
+
+  const tbody = document.getElementById('quickListTbody');
+  tbody.innerHTML = filas.length ? filas.map(f=>`
+    <tr>
+      <td><b>${escapeHtml(f.nombre)}</b></td>
+      <td>${escapeHtml(f.tipo)}</td>
+      <td><span class="estado-pill ${estCls}">${formatDate(f.fecha)}</span></td>
+    </tr>`).join('') : `<tr><td colspan="3" style="color:var(--ink-soft);text-align:center;padding:20px;">Sin resultados.</td></tr>`;
+}
+document.getElementById('btnVolverQuickList').addEventListener('click', ()=>{
+  document.getElementById('quickListWrap').classList.add('hidden');
+  document.getElementById('tableWrapNormal').classList.remove('hidden');
+  renderPersonas();
+});
+
 function renderCatPanels(){
   const el = document.getElementById('catPanels');
   const activasIds = personas.filter(p=>(p.estado||'Activo')==='Activo').map(p=>p.id);
@@ -455,9 +503,7 @@ function renderCatPanels(){
 
   el.querySelectorAll('.cat-num').forEach(box=>{
     box.addEventListener('click', ()=>{
-      const key = `cat::${box.dataset.cat}::${box.dataset.est}`;
-      currentFilter.quick = (currentFilter.quick === key) ? null : key;
-      renderPersonas();
+      renderQuickList(box.dataset.cat, box.dataset.est);
     });
   });
 }
@@ -493,6 +539,8 @@ let sortDir = -1; // -1 desc, 1 asc
 /* ======================= RENDER PERSONAS (tabla) ======================= */
 function renderPersonas(){
   document.getElementById('personaDetalleLista').classList.add('hidden');
+  document.getElementById('quickListWrap').classList.add('hidden');
+  document.getElementById('tableWrapNormal').classList.remove('hidden');
   document.getElementById('tab-listado').classList.remove('hidden');
   document.getElementById('tab-dash').classList.add('hidden');
   document.getElementById('tabBtnListado').classList.add('active');
@@ -726,6 +774,19 @@ function abrirPersona(id){
     document.getElementById('btnAgregarDoc').classList.remove('hidden');
     document.getElementById('btnEditarPersona').classList.remove('hidden');
   }
+  if(canDelete()){
+    const btnDel = document.getElementById('btnEliminarPersonaDirecto');
+    btnDel.classList.remove('hidden');
+    btnDel.onclick = async ()=>{
+      if(!confirm(`¿Eliminar a ${p.nombre} y todos sus documentos y observaciones cargadas? No se puede deshacer.`)) return;
+      await sb.from('personas').delete().eq('id', p.id);
+      personas = personas.filter(x=>x.id!==p.id);
+      documentos = documentos.filter(x=>x.persona_id!==p.id);
+      observaciones = observaciones.filter(x=>x.persona_id!==p.id);
+      personaActual = null;
+      renderPersonas();
+    };
+  }
 
   const docs = docsDePersona(id);
   const tbody = document.getElementById('tbodyDocsPersona');
@@ -739,7 +800,6 @@ function abrirPersona(id){
       <td>${formatDate(d.fecha_emision)||'—'}</td>
       <td>${formatDate(d.fecha_vencimiento)||'—'}</td>
       <td><span class="estado-pill ${estadoCls}">${estadoLabel}</span></td>
-      <td>${escapeHtml((d.observaciones||'').slice(0,60))}</td>
     </tr>`;
   }).join('');
   tbody.querySelectorAll('tr').forEach(tr=>{
@@ -756,14 +816,10 @@ function openDocDetail(id){
   panel.innerHTML = `
     <div class="panel-header"><h2>${escapeHtml(tipo?tipo.nombre:'Documento')}</h2><button class="close-x" id="closeBtn">&times;</button></div>
     <div class="row2">
-      <div class="field"><label>Fecha de emisión</label><input type="date" id="dd-emision" value="${d.fecha_emision||''}" ${ro?'disabled':''}></div>
+      <div class="field"><label>Fecha de carga</label><input type="date" id="dd-emision" value="${d.fecha_emision||''}" ${ro?'disabled':''}></div>
       <div class="field"><label>Fecha de vencimiento</label><input type="date" id="dd-vencimiento" value="${d.fecha_vencimiento||''}" ${ro?'disabled':''}></div>
     </div>
     <div class="field"><label><input type="checkbox" id="dd-noaplica" ${d.no_aplica?'checked':''} ${ro?'disabled':''}> No aplica a esta persona</label></div>
-    <div class="row2">
-      <div class="field"><label>Responsable</label><input type="text" id="dd-responsable" value="${escapeHtml(d.responsable||'')}" ${ro?'disabled':''}></div>
-    </div>
-    <div class="field"><label>Observaciones</label><textarea id="dd-observaciones" ${ro?'disabled':''}>${escapeHtml(d.observaciones||'')}</textarea></div>
     <div class="save-indicator" id="saveIndicator"></div>
     ${canDelete() ? `<div class="modal-actions"><button class="btn" id="btnDeleteDoc" style="color:var(--rojo);">Eliminar registro</button></div>` : ''}
   `;
@@ -773,17 +829,14 @@ function openDocDetail(id){
       d.fecha_emision = document.getElementById('dd-emision').value || null;
       d.fecha_vencimiento = document.getElementById('dd-vencimiento').value || null;
       d.no_aplica = document.getElementById('dd-noaplica').checked;
-      d.responsable = document.getElementById('dd-responsable').value.trim();
-      d.observaciones = document.getElementById('dd-observaciones').value.trim();
       await sb.from('documentos_persona').update({
         fecha_emision: d.fecha_emision, fecha_vencimiento: d.fecha_vencimiento,
-        no_aplica: d.no_aplica, responsable: d.responsable, observaciones: d.observaciones
+        no_aplica: d.no_aplica
       }).eq('id', d.id);
       abrirPersona(personaActual);
       flashSaved();
     };
     ['dd-emision','dd-vencimiento','dd-noaplica'].forEach(id2=> document.getElementById(id2).addEventListener('change', guardar));
-    ['dd-responsable','dd-observaciones'].forEach(id2=> document.getElementById(id2).addEventListener('blur', guardar));
     if(document.getElementById('btnDeleteDoc')){
       document.getElementById('btnDeleteDoc').addEventListener('click', async ()=>{
         if(!confirm('¿Eliminar este registro? No se puede deshacer.')) return;
@@ -947,14 +1000,14 @@ document.getElementById('btnNuevaPersona').addEventListener('click', ()=>{
 
 /* ======================= EXPORTAR CSV ======================= */
 document.getElementById('btnExport').addEventListener('click', ()=>{
-  const headers = ['Persona','Sector','Categoría','Tipo','Fecha emisión','Fecha vencimiento','Estado','Responsable','Observaciones'];
+  const headers = ['Persona','Sector','Categoría','Documentación','Fecha de carga','Fecha vencimiento','Estado'];
   const rows = [];
   personasFiltradas().forEach(p=>{
     docsDePersona(p.id).forEach(d=>{
       const tipo = tiposDocumento.find(t=>t.id===d.tipo_documento_id);
       const v = venceInfo(d);
       const estadoLabel = {vencido:'Vencido', porvencer:'Por vencer', vigente:'Vigente', no_aplica:'No aplica'}[v.estado];
-      rows.push([p.nombre,p.sector,p.categoria,tipo?tipo.nombre:'',formatDate(d.fecha_emision),formatDate(d.fecha_vencimiento),estadoLabel,d.responsable,d.observaciones]
+      rows.push([p.nombre,p.sector,p.categoria,tipo?tipo.nombre:'',formatDate(d.fecha_emision),formatDate(d.fecha_vencimiento),estadoLabel]
         .map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(','));
     });
   });

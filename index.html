@@ -23,6 +23,7 @@
 
   #loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
   .login-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:36px 32px;width:100%;max-width:360px;}
+  .login-logo{display:block;height:44px;margin:0 auto 22px;}
   .login-card h1{font-size:19px;margin:0 0 4px;}
   .login-card p{font-size:13px;color:var(--ink-soft);margin:0 0 20px;}
   .field{margin-bottom:14px;}
@@ -39,7 +40,9 @@
 
   #appShell{display:flex;min-height:100vh;}
   .sidebar{width:220px;background:var(--brand-dark);color:#fff;padding:20px 14px;flex-shrink:0;}
-  .sidebar .brand{font-size:15px;font-weight:700;margin-bottom:24px;padding-left:6px;}
+  .sidebar .brand{margin-bottom:20px;padding:10px 12px;background:#fff;border-radius:8px;}
+  .sidebar .brand img{display:block;width:100%;height:auto;}
+  .sidebar .brand-sub{font-size:11px;font-weight:600;color:var(--brand-light);text-transform:uppercase;letter-spacing:0.04em;margin:8px 0 20px 6px;}
   .navitem{display:block;padding:9px 10px;border-radius:6px;font-size:13px;color:#D7D9E0;text-decoration:none;margin-bottom:2px;cursor:pointer;}
   .navitem.active{background:rgba(255,255,255,0.12);color:#fff;font-weight:500;}
   .main{flex:1;padding:26px 28px;max-width:1600px;}
@@ -101,6 +104,22 @@
   .estado-vigente{background:var(--verde-bg);color:var(--verde);border-color:transparent;}
   .estado-noaplica{background:#EEE;color:#999;border-color:transparent;}
   .empty{padding:48px 20px;text-align:center;color:var(--ink-soft);font-size:14px;}
+  .tabs{display:flex;gap:4px;margin-bottom:18px;border-bottom:1px solid var(--line);}
+  .tab-btn{font-family:var(--sans);font-size:13px;font-weight:500;padding:9px 4px;margin-right:20px;border:none;background:none;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;}
+  .tab-btn.active{color:var(--ink);border-bottom-color:var(--brand-dark);}
+  th.sortable{cursor:pointer;user-select:none;}
+  th.sortable:hover{color:var(--ink);}
+  .sort-arrow{font-size:9px;}
+  .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .dash-card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;}
+  .dash-card h3{font-size:14px;margin:0 0 16px;}
+  .pie-wrap{display:flex;align-items:center;gap:24px;flex-wrap:wrap;}
+  .pie{width:150px;height:150px;border-radius:50%;flex-shrink:0;}
+  .pie-legend{display:flex;flex-direction:column;gap:10px;font-size:13px;}
+  .pie-legend .row{display:flex;align-items:center;gap:8px;}
+  .pie-legend .sw{width:12px;height:12px;border-radius:3px;flex-shrink:0;}
+  .pie-legend .val{font-family:var(--mono);font-weight:700;margin-left:auto;padding-left:14px;}
+  @media (max-width:800px){ .dash-grid{grid-template-columns:1fr;} }
 
   .overlay{position:fixed;inset:0;background:rgba(20,22,30,0.42);display:none;align-items:center;justify-content:center;z-index:50;padding:24px;}
   .overlay.show{display:flex;}
@@ -125,6 +144,7 @@
 
 <div id="loginScreen">
   <div class="login-card">
+    <img src="logo-prodigyo.jpg" alt="Prodigyo" class="login-logo">
     <h1>Control de Contratistas</h1>
     <p>Ingresá con el usuario que te crearon.</p>
     <div class="field"><label>Email</label><input type="text" id="loginEmail" autocomplete="username"></div>
@@ -136,7 +156,8 @@
 
 <div id="appShell" class="hidden">
   <div class="sidebar">
-    <div class="brand">🦺 Control de Contratistas</div>
+    <div class="brand"><img src="logo-prodigyo.jpg" alt="Prodigyo"></div>
+    <div class="brand-sub">🦺 Control de Contratistas</div>
     <div class="navitem active" data-view="home" id="navHome"><span class="txt">Inicio</span></div>
     <div class="navitem" data-view="personas" id="navPersonas"><span class="txt">Personas</span></div>
   </div>
@@ -169,6 +190,12 @@
 
       <div class="stats" id="stats"></div>
 
+      <div class="tabs">
+        <button class="tab-btn active" id="tabBtnListado">Listado</button>
+        <button class="tab-btn" id="tabBtnDash">Dashboard</button>
+      </div>
+
+      <div id="tab-listado">
       <div class="toolbar">
         <input type="text" id="fBuscar" placeholder="Buscar por nombre, sector...">
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);white-space:nowrap;">
@@ -181,8 +208,25 @@
         <button class="btn btn-primary hidden" id="btnNuevaPersona">+ Nueva persona</button>
       </div>
 
-      <div id="personasGrid" class="pers-grid"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="sortable" data-sort="nombre">Nombre <span class="sort-arrow"></span></th>
+              <th class="sortable" data-sort="sector">Sector <span class="sort-arrow"></span></th>
+              <th class="sortable" data-sort="vencido">Vencidos <span class="sort-arrow"></span></th>
+              <th class="sortable" data-sort="porvencer">Por vencer <span class="sort-arrow"></span></th>
+              <th class="sortable" data-sort="vigente">Vigentes <span class="sort-arrow"></span></th>
+              <th class="sortable" data-sort="estado">Estado <span class="sort-arrow"></span></th>
+            </tr>
+          </thead>
+          <tbody id="personasTbody"></tbody>
+        </table>
+      </div>
       <div class="empty hidden" id="emptyMsg">Todavía no hay personas cargadas.</div>
+      </div>
+
+      <div id="tab-dash" class="hidden"></div>
 
       <div id="personaDetalleLista" class="hidden">
         <button class="btn" id="btnVolverPersonas">← Volver a personas</button>
@@ -371,46 +415,148 @@ function personasFiltradas(){
   return list;
 }
 
-/* ======================= RENDER PERSONAS ======================= */
+let sortCol = 'vencido';
+let sortDir = -1; // -1 desc, 1 asc
+
+/* ======================= RENDER PERSONAS (tabla) ======================= */
 function renderPersonas(){
   document.getElementById('personaDetalleLista').classList.add('hidden');
-  document.getElementById('personasGrid').classList.remove('hidden');
+  document.getElementById('tab-listado').classList.remove('hidden');
+  document.getElementById('tab-dash').classList.add('hidden');
+  document.getElementById('tabBtnListado').classList.add('active');
+  document.getElementById('tabBtnDash').classList.remove('active');
   renderStats();
-  const list = personasFiltradas();
-  const grid = document.getElementById('personasGrid');
+  let list = personasFiltradas().map(p=>{
+    const docs = docsDePersona(p.id);
+    return {
+      p,
+      vencido: docs.filter(d=>venceInfo(d).estado==='vencido').length,
+      porvencer: docs.filter(d=>venceInfo(d).estado==='porvencer').length,
+      vigente: docs.filter(d=>venceInfo(d).estado==='vigente').length,
+    };
+  });
+
+  list.sort((a,b)=>{
+    let va, vb;
+    if(sortCol==='nombre'){ va=a.p.nombre.toLowerCase(); vb=b.p.nombre.toLowerCase(); return va<vb?-1*sortDir:va>vb?1*sortDir:0; }
+    if(sortCol==='sector'){ va=(a.p.sector||'').toLowerCase(); vb=(b.p.sector||'').toLowerCase(); return va<vb?-1*sortDir:va>vb?1*sortDir:0; }
+    if(sortCol==='estado'){ va=a.p.activo===false?1:0; vb=b.p.activo===false?1:0; return (va-vb)*sortDir; }
+    va = a[sortCol]; vb = b[sortCol];
+    return (va-vb)*sortDir;
+  });
+
+  const tbody = document.getElementById('personasTbody');
   const emptyMsg = document.getElementById('emptyMsg');
-  if(list.length===0){ grid.innerHTML=''; emptyMsg.classList.remove('hidden'); return; }
+  if(list.length===0){ tbody.innerHTML=''; emptyMsg.classList.remove('hidden'); return; }
   emptyMsg.classList.add('hidden');
 
-  grid.innerHTML = list.map(p=>{
-    const docs = docsDePersona(p.id);
-    const vencidos = docs.filter(d=>venceInfo(d).estado==='vencido').length;
-    const porVencer = docs.filter(d=>venceInfo(d).estado==='porvencer').length;
-    const vigentes = docs.filter(d=>venceInfo(d).estado==='vigente').length;
+  tbody.innerHTML = list.map(({p,vencido,porvencer,vigente})=>{
     const baja = p.activo===false;
     return `
-      <div class="pers-card${baja?' pers-baja':''}" data-id="${p.id}">
-        <h3>${escapeHtml(p.nombre)} ${baja?'<span class="baja-tag">BAJA</span>':''}</h3>
-        <div class="sub2">${escapeHtml(p.sector||'—')}${p.categoria?' · '+escapeHtml(p.categoria):''}</div>
-        <div class="pers-stats">
-          <div><div class="num num-vencido">${vencidos}</div><div class="lbl">Vencidos</div></div>
-          <div><div class="num num-porvencer">${porVencer}</div><div class="lbl">Por vencer</div></div>
-          <div><div class="num num-vigente">${vigentes}</div><div class="lbl">Vigentes</div></div>
-        </div>
-      </div>`;
+      <tr data-id="${p.id}" class="${vencido>0?'row-vencido':''}">
+        <td><b>${escapeHtml(p.nombre)}</b></td>
+        <td>${escapeHtml(p.sector||'—')}${p.categoria?' · '+escapeHtml(p.categoria):''}</td>
+        <td><span class="num-vencido" style="font-family:var(--mono);font-weight:700;">${vencido}</span></td>
+        <td><span class="num-porvencer" style="font-family:var(--mono);font-weight:700;">${porvencer}</span></td>
+        <td><span class="num-vigente" style="font-family:var(--mono);font-weight:700;">${vigente}</span></td>
+        <td>${baja?'<span class="baja-tag">BAJA</span>':'<span class="estado-pill estado-vigente">Activo</span>'}</td>
+      </tr>`;
   }).join('');
-  grid.querySelectorAll('.pers-card').forEach(card=>{
-    card.addEventListener('click', ()=> abrirPersona(card.dataset.id));
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    tr.addEventListener('click', ()=> abrirPersona(tr.dataset.id));
+  });
+  updateSortArrows();
+}
+
+function updateSortArrows(){
+  document.querySelectorAll('th.sortable').forEach(th=>{
+    const arrow = th.querySelector('.sort-arrow');
+    if(th.dataset.sort===sortCol) arrow.textContent = sortDir===1 ? '▲' : '▼';
+    else arrow.textContent = '';
   });
 }
+document.querySelectorAll('th.sortable').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const col = th.dataset.sort;
+    if(sortCol===col) sortDir = -sortDir;
+    else { sortCol = col; sortDir = -1; }
+    renderPersonas();
+  });
+});
+
 document.getElementById('fBuscar').addEventListener('input', e=>{ currentFilter.buscar = e.target.value; renderPersonas(); });
 document.getElementById('chkMostrarBajas').addEventListener('change', renderPersonas);
 document.getElementById('btnVolverPersonas').addEventListener('click', ()=>{ personaActual=null; renderPersonas(); });
 
+/* ======================= DASHBOARD (tortas) ======================= */
+document.getElementById('tabBtnListado').addEventListener('click', renderPersonas);
+document.getElementById('tabBtnDash').addEventListener('click', renderDashboard);
+
+function conicPie(segments){
+  // segments: [{value, color}]
+  const total = segments.reduce((s,x)=>s+x.value,0) || 1;
+  let acc = 0;
+  const parts = segments.filter(s=>s.value>0).map(s=>{
+    const start = (acc/total)*360;
+    acc += s.value;
+    const end = (acc/total)*360;
+    return `${s.color} ${start}deg ${end}deg`;
+  });
+  if(parts.length===0) return '#E5EAF0';
+  return `conic-gradient(${parts.join(', ')})`;
+}
+
+function renderDashboard(){
+  document.getElementById('personaDetalleLista').classList.add('hidden');
+  document.getElementById('tab-listado').classList.add('hidden');
+  document.getElementById('tab-dash').classList.remove('hidden');
+  document.getElementById('tabBtnListado').classList.remove('active');
+  document.getElementById('tabBtnDash').classList.add('active');
+
+  const activos = personas.filter(p=>p.activo!==false).length;
+  const bajas = personas.filter(p=>p.activo===false).length;
+  const totalPersonas = personas.length || 1;
+
+  const vencidos = documentos.filter(d=>venceInfo(d).estado==='vencido').length;
+  const porVencer = documentos.filter(d=>venceInfo(d).estado==='porvencer').length;
+  const vigentes = documentos.filter(d=>venceInfo(d).estado==='vigente').length;
+  const totalDocs = (vencidos+porVencer+vigentes) || 1;
+
+  const pieA = conicPie([{value:activos, color:'var(--verde)'},{value:bajas, color:'#B9C2CC'}]);
+  const pieB = conicPie([{value:vencidos, color:'var(--rojo)'},{value:porVencer, color:'var(--amarillo)'},{value:vigentes, color:'var(--verde)'}]);
+
+  const el = document.getElementById('tab-dash');
+  el.innerHTML = `
+    <div class="dash-grid">
+      <div class="dash-card">
+        <h3>Personas: Activas vs Bajas</h3>
+        <div class="pie-wrap">
+          <div class="pie" style="background:${pieA};"></div>
+          <div class="pie-legend">
+            <div class="row"><span class="sw" style="background:var(--verde);"></span> Activas <span class="val">${activos} (${Math.round(activos/totalPersonas*100)}%)</span></div>
+            <div class="row"><span class="sw" style="background:#B9C2CC;"></span> Dadas de baja <span class="val">${bajas} (${Math.round(bajas/totalPersonas*100)}%)</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="dash-card">
+        <h3>Documentos: Vencidos, por vencer y vigentes</h3>
+        <div class="pie-wrap">
+          <div class="pie" style="background:${pieB};"></div>
+          <div class="pie-legend">
+            <div class="row"><span class="sw" style="background:var(--rojo);"></span> Vencidos <span class="val">${vencidos} (${Math.round(vencidos/totalDocs*100)}%)</span></div>
+            <div class="row"><span class="sw" style="background:var(--amarillo);"></span> Por vencer <span class="val">${porVencer} (${Math.round(porVencer/totalDocs*100)}%)</span></div>
+            <div class="row"><span class="sw" style="background:var(--verde);"></span> Vigentes <span class="val">${vigentes} (${Math.round(vigentes/totalDocs*100)}%)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function abrirPersona(id){
   personaActual = id;
   const p = personas.find(x=>x.id===id); if(!p) return;
-  document.getElementById('personasGrid').classList.add('hidden');
+  document.getElementById('tab-listado').classList.add('hidden');
   document.getElementById('emptyMsg').classList.add('hidden');
   document.getElementById('personaDetalleLista').classList.remove('hidden');
   document.getElementById('personaDetalleTitulo').innerHTML = `${escapeHtml(p.nombre)} ${p.activo===false?'<span class="baja-tag">BAJA'+(p.fecha_baja?' · '+formatDate(p.fecha_baja):'')+'</span>':''}`;

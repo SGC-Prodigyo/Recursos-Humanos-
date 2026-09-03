@@ -126,6 +126,7 @@
   .tab-btn{font-family:var(--sans);font-size:13px;font-weight:500;padding:9px 4px;margin-right:20px;border:none;background:none;color:var(--ink-soft);cursor:pointer;border-bottom:2px solid transparent;}
   .tab-btn.active{color:var(--ink);border-bottom-color:var(--brand-dark);}
   th.sortable{cursor:pointer;user-select:none;}
+  th.col-chica, td.col-chica{width:52px;text-align:center;}
   th.sortable:hover{color:var(--ink);}
   .sort-arrow{font-size:9px;}
   .btn-toggle{background:none;border:1px solid var(--line-strong);border-radius:5px;width:22px;height:22px;cursor:pointer;font-size:10px;color:var(--ink-soft);padding:0;}
@@ -134,6 +135,11 @@
   tr.fila-expandida td{background:#F7FAFD;padding:10px 12px;cursor:default;}
   tr.fila-expandida:hover td{background:#F7FAFD;}
   .venc-lista{display:flex;flex-wrap:wrap;gap:6px;}
+  .btn-obs{background:none;border:1px solid var(--line-strong);border-radius:5px;padding:3px 7px;cursor:pointer;font-size:12px;}
+  .btn-obs:hover{background:#EEF5FC;}
+  .obs-item{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:8px;font-size:12px;}
+  .obs-meta{color:var(--ink-soft);font-size:11px;margin-bottom:4px;}
+  .estado-cerrada-pill{background:#EEE;color:#777;border-color:transparent;}
   .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
   .dash-card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;}
   .dash-card h3{font-size:14px;margin:0 0 16px;}
@@ -189,7 +195,7 @@
     <div class="brand"><img src="logo-prodigyo.jpg" alt="Prodigyo"></div>
     <div class="brand-sub">🦺 Control de Contratistas</div>
     <div class="navitem active" data-view="home" id="navHome"><span class="txt">Inicio</span></div>
-    <div class="navitem" data-view="personas" id="navPersonas"><span class="txt">Personas</span></div>
+    <div class="navitem" data-view="personas" id="navPersonas"><span class="txt">Control de Contratistas</span></div>
   </div>
   <div class="main">
 
@@ -199,7 +205,7 @@
       <div class="module-grid">
         <div class="module-card" id="cardPersonas">
           <div class="module-icon">🦺</div>
-          <h3>Personas</h3>
+          <h3>Control de Contratistas</h3>
           <p>Exámenes médicos, cursos, EPP y accesos a sitios de cliente por persona.</p>
         </div>
       </div>
@@ -208,7 +214,7 @@
     <div id="view-personas" class="view hidden">
       <div class="topbar">
         <div>
-          <h1 class="pagetitle">Personas</h1>
+          <h1 class="pagetitle">Control de Contratistas</h1>
           <p class="sub">Vencimientos de exámenes, cursos, EPP y accesos a sitios de cliente.</p>
         </div>
         <div class="userbox">
@@ -228,9 +234,12 @@
       <div id="tab-listado">
       <div class="toolbar">
         <input type="text" id="fBuscar" placeholder="Buscar por nombre, sector...">
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);white-space:nowrap;">
-          <input type="checkbox" id="chkMostrarBajas"> Mostrar dados de baja
-        </label>
+        <select id="fEstadoPersona">
+          <option value="Activo">Solo activos</option>
+          <option value="Standby">Solo standby</option>
+          <option value="Baja">Solo bajas</option>
+          <option value="todos">Todos los estados</option>
+        </select>
         <div class="spacer"></div>
         <button class="btn" id="btnActualizar">↻ Actualizar</button>
         <button class="btn" id="btnExport">Exportar CSV</button>
@@ -244,12 +253,12 @@
             <tr>
               <th class="sortable" data-sort="nombre">Nombre <span class="sort-arrow"></span></th>
               <th class="sortable" data-sort="sector">Sector <span class="sort-arrow"></span></th>
-              <th class="sortable" data-sort="vencido">Vencidos <span class="sort-arrow"></span></th>
-              <th class="sortable" data-sort="porvencer">Por vencer <span class="sort-arrow"></span></th>
-              <th class="sortable" data-sort="vigente">Vigentes <span class="sort-arrow"></span></th>
+              <th class="sortable col-chica" data-sort="vencido">Venc. <span class="sort-arrow"></span></th>
+              <th class="sortable col-chica" data-sort="porvencer">Por venc. <span class="sort-arrow"></span></th>
+              <th class="sortable col-chica" data-sort="vigente">Vig. <span class="sort-arrow"></span></th>
               <th class="sortable" data-sort="estado">Estado <span class="sort-arrow"></span></th>
-              <th>Próximo vencimiento</th>
-              <th style="width:26px;"></th>
+              <th>Vencimientos</th>
+              <th class="col-chica">OBS</th>
             </tr>
           </thead>
           <tbody id="personasTbody"></tbody>
@@ -301,6 +310,7 @@ let profile = null;
 let personas = [];
 let tiposDocumento = [];
 let documentos = [];
+let observaciones = [];
 let currentFilter = { buscar:'', quick:null, sector:null };
 let personaActual = null;
 
@@ -386,16 +396,22 @@ document.getElementById('cardPersonas').addEventListener('click', ()=> showView(
 
 /* ======================= DATA ======================= */
 async function loadAll(){
-  const [{data: p}, {data: td}, {data: dp}] = await Promise.all([
+  const [{data: p}, {data: td}, {data: dp}, {data: ob}] = await Promise.all([
     sb.from('personas').select('*').order('nombre'),
     sb.from('tipos_documento').select('*').order('nombre'),
-    sb.from('documentos_persona').select('*')
+    sb.from('documentos_persona').select('*'),
+    sb.from('observaciones_persona').select('*').order('fecha', {ascending:false})
   ]);
   personas = p || [];
   tiposDocumento = td || [];
   documentos = dp || [];
+  observaciones = ob || [];
   document.getElementById('tipoDocList').innerHTML = tiposDocumento.map(t=>`<option value="${escapeHtml(t.nombre)}">`).join('');
   document.getElementById('sectorList').innerHTML = [...new Set(personas.map(p=>p.sector).filter(Boolean))].map(s=>`<option value="${escapeHtml(s)}">`).join('');
+}
+
+function obsDePersona(personaId){
+  return observaciones.filter(o=>o.persona_id===personaId);
 }
 
 function venceInfo(doc){
@@ -415,7 +431,7 @@ function docsDePersona(personaId){
 /* ======================= STATS + FILTER ======================= */
 function renderCatPanels(){
   const el = document.getElementById('catPanels');
-  const activasIds = personas.filter(p=>p.activo!==false).map(p=>p.id);
+  const activasIds = personas.filter(p=>(p.estado||'Activo')==='Activo').map(p=>p.id);
   const docsActivos = documentos.filter(d=>activasIds.includes(d.persona_id) && !d.no_aplica && d.fecha_vencimiento);
   const categorias = ['Examen','Capacitación','EPP','Curso'];
 
@@ -448,8 +464,10 @@ function renderCatPanels(){
 
 function personasFiltradas(){
   let list = personas;
-  const mostrarBajas = document.getElementById('chkMostrarBajas').checked;
-  list = list.filter(p => mostrarBajas || p.activo!==false);
+  const filtroEstado = document.getElementById('fEstadoPersona').value;
+  if(filtroEstado !== 'todos'){
+    list = list.filter(p => (p.estado||'Activo') === filtroEstado);
+  }
   if(currentFilter.buscar){
     const q = currentFilter.buscar.toLowerCase();
     list = list.filter(p => `${p.nombre} ${p.sector} ${p.categoria}`.toLowerCase().includes(q));
@@ -471,7 +489,6 @@ function personasFiltradas(){
 
 let sortCol = 'vencido';
 let sortDir = -1; // -1 desc, 1 asc
-let expandedPersonas = new Set();
 
 /* ======================= RENDER PERSONAS (tabla) ======================= */
 function renderPersonas(){
@@ -500,7 +517,7 @@ function renderPersonas(){
     let va, vb;
     if(sortCol==='nombre'){ va=a.p.nombre.toLowerCase(); vb=b.p.nombre.toLowerCase(); return va<vb?-1*sortDir:va>vb?1*sortDir:0; }
     if(sortCol==='sector'){ va=(a.p.sector||'').toLowerCase(); vb=(b.p.sector||'').toLowerCase(); return va<vb?-1*sortDir:va>vb?1*sortDir:0; }
-    if(sortCol==='estado'){ va=a.p.activo===false?1:0; vb=b.p.activo===false?1:0; return (va-vb)*sortDir; }
+    if(sortCol==='estado'){ const ord={Activo:0,Standby:1,Baja:2}; va=ord[a.p.estado||'Activo']; vb=ord[b.p.estado||'Activo']; return (va-vb)*sortDir; }
     va = a[sortCol]; vb = b[sortCol];
     return (va-vb)*sortDir;
   });
@@ -511,40 +528,33 @@ function renderPersonas(){
   emptyMsg.classList.add('hidden');
 
   const estadoCls = {vencido:'estado-vencido', porvencer:'estado-porvencer', vigente:'estado-vigente'};
+  const estadoPersonaCls = {Activo:'estado-vigente', Standby:'estado-porvencer', Baja:'estado-cerrada-pill'};
 
   tbody.innerHTML = list.map(({p,vencido,porvencer,vigente,items})=>{
-    const baja = p.activo===false;
-    const proximo = items[0];
-    const expandido = expandedPersonas.has(p.id);
-    const filaPrincipal = `
+    const est = p.estado || 'Activo';
+    const nObs = obsDePersona(p.id).length;
+    return `
       <tr data-id="${p.id}" class="${vencido>0?'row-vencido':''}">
         <td><b>${escapeHtml(p.nombre)}</b></td>
         <td>${escapeHtml(p.sector||'—')}${p.categoria?' · '+escapeHtml(p.categoria):''}</td>
-        <td><span class="num-vencido" style="font-family:var(--mono);font-weight:700;">${vencido}</span></td>
-        <td><span class="num-porvencer" style="font-family:var(--mono);font-weight:700;">${porvencer}</span></td>
-        <td><span class="num-vigente" style="font-family:var(--mono);font-weight:700;">${vigente}</span></td>
-        <td>${baja?'<span class="baja-tag">BAJA</span>':'<span class="estado-pill estado-vigente">Activo</span>'}</td>
-        <td>${proximo?`<span class="venc-mini ${estadoCls[proximo.estado]}">${escapeHtml(proximo.tipo)} · ${formatDate(proximo.fecha)}</span>`:'<span style="color:var(--ink-soft);">—</span>'}</td>
-        <td><button class="btn-toggle" data-toggle="${p.id}">${expandido?'▲':'▼'}</button></td>
+        <td class="col-chica"><span class="num-vencido" style="font-family:var(--mono);font-weight:700;">${vencido}</span></td>
+        <td class="col-chica"><span class="num-porvencer" style="font-family:var(--mono);font-weight:700;">${porvencer}</span></td>
+        <td class="col-chica"><span class="num-vigente" style="font-family:var(--mono);font-weight:700;">${vigente}</span></td>
+        <td><span class="estado-pill ${estadoPersonaCls[est]}">${est}</span></td>
+        <td>${items.length ? `<div class="venc-lista">${items.map(it=>`<span class="venc-mini ${estadoCls[it.estado]}">${escapeHtml(it.tipo)} · ${formatDate(it.fecha)}</span>`).join('')}</div>` : '<span style="color:var(--ink-soft);">—</span>'}</td>
+        <td class="col-chica"><button class="btn-obs" data-obs="${p.id}">${nObs>0?'📝 '+nObs:'📝'}</button></td>
       </tr>`;
-    const filaExpandida = expandido ? `
-      <tr class="fila-expandida"><td colspan="8">
-        ${items.length ? `<div class="venc-lista">${items.map(it=>`<div class="venc-mini ${estadoCls[it.estado]}">${escapeHtml(it.tipo)} · ${formatDate(it.fecha)}</div>`).join('')}</div>` : '<div style="font-size:12px;color:var(--ink-soft);">Sin vencimientos cargados.</div>'}
-      </td></tr>` : '';
-    return filaPrincipal + filaExpandida;
   }).join('');
   tbody.querySelectorAll('tr[data-id]').forEach(tr=>{
     tr.addEventListener('click', (e)=>{
-      if(e.target.closest('[data-toggle]')) return;
+      if(e.target.closest('[data-obs]')) return;
       abrirPersona(tr.dataset.id);
     });
   });
-  tbody.querySelectorAll('[data-toggle]').forEach(btn=>{
+  tbody.querySelectorAll('[data-obs]').forEach(btn=>{
     btn.addEventListener('click', (e)=>{
       e.stopPropagation();
-      const id = btn.dataset.toggle;
-      if(expandedPersonas.has(id)) expandedPersonas.delete(id); else expandedPersonas.add(id);
-      renderPersonas();
+      openObsPanel(btn.dataset.obs);
     });
   });
   updateSortArrows();
@@ -567,7 +577,7 @@ document.querySelectorAll('th.sortable').forEach(th=>{
 });
 
 document.getElementById('fBuscar').addEventListener('input', e=>{ currentFilter.buscar = e.target.value; renderPersonas(); });
-document.getElementById('chkMostrarBajas').addEventListener('change', renderPersonas);
+document.getElementById('fEstadoPersona').addEventListener('change', renderPersonas);
 document.getElementById('btnVolverPersonas').addEventListener('click', ()=>{ personaActual=null; renderPersonas(); });
 
 /* ======================= DASHBOARD (tortas) ======================= */
@@ -595,8 +605,9 @@ function renderDashboard(){
   document.getElementById('tabBtnListado').classList.remove('active');
   document.getElementById('tabBtnDash').classList.add('active');
 
-  const activos = personas.filter(p=>p.activo!==false).length;
-  const bajas = personas.filter(p=>p.activo===false).length;
+  const activos = personas.filter(p=>(p.estado||'Activo')==='Activo').length;
+  const standby = personas.filter(p=>p.estado==='Standby').length;
+  const bajas = personas.filter(p=>p.estado==='Baja').length;
   const totalPersonas = personas.length || 1;
 
   const vencidos = documentos.filter(d=>venceInfo(d).estado==='vencido').length;
@@ -604,12 +615,12 @@ function renderDashboard(){
   const vigentes = documentos.filter(d=>venceInfo(d).estado==='vigente').length;
   const totalDocs = (vencidos+porVencer+vigentes) || 1;
 
-  const pieA = conicPie([{value:activos, color:'var(--verde)'},{value:bajas, color:'#B9C2CC'}]);
+  const pieA = conicPie([{value:activos, color:'var(--verde)'},{value:standby, color:'var(--amarillo)'},{value:bajas, color:'#B9C2CC'}]);
   const pieB = conicPie([{value:vencidos, color:'var(--rojo)'},{value:porVencer, color:'var(--amarillo)'},{value:vigentes, color:'var(--verde)'}]);
 
-  const sectores = [...new Set(personas.filter(p=>p.activo!==false).map(p=>p.sector||'Sin sector'))].sort();
+  const sectores = [...new Set(personas.filter(p=>(p.estado||'Activo')==='Activo').map(p=>p.sector||'Sin sector'))].sort();
   const porSector = sectores.map(sec=>{
-    const idsSector = personas.filter(p=>p.activo!==false && (p.sector||'Sin sector')===sec).map(p=>p.id);
+    const idsSector = personas.filter(p=>(p.estado||'Activo')==='Activo' && (p.sector||'Sin sector')===sec).map(p=>p.id);
     const docsSector = documentos.filter(d=>idsSector.includes(d.persona_id) && !d.no_aplica && d.fecha_vencimiento);
     const v = docsSector.filter(d=>venceInfo(d).estado==='vencido').length;
     const pv = docsSector.filter(d=>venceInfo(d).estado==='porvencer').length;
@@ -622,11 +633,12 @@ function renderDashboard(){
   el.innerHTML = `
     <div class="dash-grid">
       <div class="dash-card">
-        <h3>Personas: Activas vs Bajas</h3>
+        <h3>Personas: Activas, Standby y Bajas</h3>
         <div class="pie-wrap">
           <div class="pie" style="background:${pieA};"></div>
           <div class="pie-legend">
             <div class="row"><span class="sw" style="background:var(--verde);"></span> Activas <span class="val">${activos} (${Math.round(activos/totalPersonas*100)}%)</span></div>
+            <div class="row"><span class="sw" style="background:var(--amarillo);"></span> Standby <span class="val">${standby} (${Math.round(standby/totalPersonas*100)}%)</span></div>
             <div class="row"><span class="sw" style="background:#B9C2CC;"></span> Dadas de baja <span class="val">${bajas} (${Math.round(bajas/totalPersonas*100)}%)</span></div>
           </div>
         </div>
@@ -662,13 +674,53 @@ function renderDashboard(){
   `;
 }
 
+function openObsPanel(personaId){
+  const p = personas.find(x=>x.id===personaId); if(!p) return;
+  const ro = !canEdit();
+  const items = obsDePersona(personaId);
+  const panel = document.getElementById('panel');
+  panel.innerHTML = `
+    <div class="panel-header"><h2>Observaciones — ${escapeHtml(p.nombre)}</h2><button class="close-x" id="closeBtn">&times;</button></div>
+    <div id="obsList">
+      ${items.length ? items.map(o=>`
+        <div class="obs-item">
+          <div class="obs-meta">${formatDate(o.fecha)} · ${escapeHtml(o.autor_nombre||'')}</div>
+          <div>${escapeHtml(o.nota)}</div>
+        </div>`).join('') : '<div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">Todavía no hay observaciones cargadas.</div>'}
+    </div>
+    ${ro ? '' : `
+    <div class="field" style="margin-top:12px;">
+      <label>Nueva observación</label>
+      <textarea id="on-nota" placeholder="Escribí la observación..."></textarea>
+    </div>
+    <div style="display:flex;justify-content:flex-end;"><button class="btn btn-primary" id="btnAddObs">Agregar</button></div>`}
+  `;
+  document.getElementById('closeBtn').addEventListener('click', closeOverlay);
+  if(!ro){
+    document.getElementById('btnAddObs').addEventListener('click', async ()=>{
+      const nota = document.getElementById('on-nota').value.trim();
+      if(!nota) return;
+      const { data, error } = await sb.from('observaciones_persona').insert({
+        persona_id: personaId, nota, autor_nombre: profile.full_name || profile.email
+      }).select().single();
+      if(error){ alert('No se pudo guardar: ' + error.message); return; }
+      observaciones.unshift(data);
+      openObsPanel(personaId);
+      renderPersonas();
+    });
+  }
+  document.getElementById('overlay').classList.add('show');
+}
+
 function abrirPersona(id){
   personaActual = id;
   const p = personas.find(x=>x.id===id); if(!p) return;
   document.getElementById('tab-listado').classList.add('hidden');
   document.getElementById('emptyMsg').classList.add('hidden');
   document.getElementById('personaDetalleLista').classList.remove('hidden');
-  document.getElementById('personaDetalleTitulo').innerHTML = `${escapeHtml(p.nombre)} ${p.activo===false?'<span class="baja-tag">BAJA'+(p.fecha_baja?' · '+formatDate(p.fecha_baja):'')+'</span>':''}`;
+  const est = p.estado || 'Activo';
+  const badgeCls = {Activo:'estado-vigente', Standby:'estado-porvencer', Baja:'estado-cerrada-pill'}[est];
+  document.getElementById('personaDetalleTitulo').innerHTML = `${escapeHtml(p.nombre)} <span class="estado-pill ${badgeCls}">${est}</span>${p.fecha_baja && est==='Baja' ? ` <span style="font-size:11px;color:var(--ink-soft);">(${formatDate(p.fecha_baja)})</span>` : ''}`;
   document.getElementById('personaDetalleSub').textContent = `${p.sector||'—'}${p.categoria?' · '+p.categoria:''}${p.dni_cuil?' · DNI/CUIL: '+p.dni_cuil:''}`;
   if(canEdit()){
     document.getElementById('btnAgregarDoc').classList.remove('hidden');
@@ -769,20 +821,21 @@ document.getElementById('btnEditarPersona').addEventListener('click', ()=>{
     <div class="field"><label>Email</label><input type="text" id="ep-email" value="${escapeHtml(p.email||'')}"></div>
     <div class="section-title">Estado</div>
     <div class="field"><label>Situación</label>
-      <select id="ep-activo">
-        <option value="true" ${p.activo!==false?'selected':''}>Activo</option>
-        <option value="false" ${p.activo===false?'selected':''}>Dado de baja</option>
+      <select id="ep-estado">
+        <option value="Activo" ${(p.estado||'Activo')==='Activo'?'selected':''}>Activo</option>
+        <option value="Standby" ${p.estado==='Standby'?'selected':''}>Standby (no va seguido a planta)</option>
+        <option value="Baja" ${p.estado==='Baja'?'selected':''}>Dado de baja</option>
       </select>
     </div>
-    <div class="field" id="ep-fechabaja-wrap" style="${p.activo===false?'':'display:none;'}">
+    <div class="field" id="ep-fechabaja-wrap" style="${p.estado==='Baja'?'':'display:none;'}">
       <label>Fecha de baja</label><input type="date" id="ep-fechabaja" value="${p.fecha_baja||''}">
     </div>
     <div class="save-indicator" id="saveIndicator"></div>
     ${canDelete() ? `<div class="modal-actions"><button class="btn" id="btnDeletePersona" style="color:var(--rojo);">Eliminar persona</button></div>` : ''}
   `;
   document.getElementById('closeBtn').addEventListener('click', closeOverlay);
-  document.getElementById('ep-activo').addEventListener('change', (e)=>{
-    document.getElementById('ep-fechabaja-wrap').style.display = e.target.value==='false' ? '' : 'none';
+  document.getElementById('ep-estado').addEventListener('change', (e)=>{
+    document.getElementById('ep-fechabaja-wrap').style.display = e.target.value==='Baja' ? '' : 'none';
   });
   const guardar = async ()=>{
     p.nombre = document.getElementById('ep-nombre').value.trim();
@@ -791,17 +844,17 @@ document.getElementById('btnEditarPersona').addEventListener('click', ()=>{
     p.categoria = document.getElementById('ep-categoria').value.trim();
     p.telefono = document.getElementById('ep-telefono').value.trim();
     p.email = document.getElementById('ep-email').value.trim();
-    p.activo = document.getElementById('ep-activo').value === 'true';
-    p.fecha_baja = p.activo ? null : (document.getElementById('ep-fechabaja').value || null);
+    p.estado = document.getElementById('ep-estado').value;
+    p.fecha_baja = p.estado==='Baja' ? (document.getElementById('ep-fechabaja').value || null) : null;
     await sb.from('personas').update({
       nombre:p.nombre, dni_cuil:p.dni_cuil, sector:p.sector, categoria:p.categoria,
-      telefono:p.telefono, email:p.email, activo:p.activo, fecha_baja:p.fecha_baja
+      telefono:p.telefono, email:p.email, estado:p.estado, fecha_baja:p.fecha_baja
     }).eq('id', p.id);
     abrirPersona(personaActual);
     flashSaved();
   };
   ['ep-nombre','ep-dni','ep-sector','ep-categoria','ep-telefono','ep-email'].forEach(id2=> document.getElementById(id2).addEventListener('blur', guardar));
-  document.getElementById('ep-activo').addEventListener('change', guardar);
+  document.getElementById('ep-estado').addEventListener('change', guardar);
   document.getElementById('ep-fechabaja').addEventListener('change', guardar);
   if(document.getElementById('btnDeletePersona')){
     document.getElementById('btnDeletePersona').addEventListener('click', async ()=>{
@@ -916,7 +969,7 @@ document.getElementById('btnExport').addEventListener('click', ()=>{
 document.getElementById('btnActualizar').addEventListener('click', async ()=>{
   currentFilter = { buscar:'', quick:null, sector:null };
   document.getElementById('fBuscar').value = '';
-  document.getElementById('chkMostrarBajas').checked = false;
+  document.getElementById('fEstadoPersona').value = 'Activo';
   await loadAll();
   personaActual = null;
   renderPersonas();

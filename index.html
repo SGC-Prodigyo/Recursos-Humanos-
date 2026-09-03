@@ -378,6 +378,7 @@ async function onLoggedIn(sess){
   renderPersonas();
   setInterval(async ()=>{
     if(document.getElementById('overlay').classList.contains('show')) return;
+    if(!document.getElementById('quickListWrap').classList.contains('hidden')) return;
     await loadAll();
     if(personaActual) abrirPersona(personaActual); else renderPersonas();
   }, 20000);

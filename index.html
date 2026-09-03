@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Contratistas</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#F5F8FC; --card:#FFFFFF; --ink:#0B3D6E; --ink-soft:#5C7A9C;
+    --line:#DCE7F2; --line-strong:#B9CFE3;
+    --mono:'IBM Plex Mono','SF Mono',Consolas,monospace;
+    --sans:'IBM Plex Sans',-apple-system,'Segoe UI',Roboto,sans-serif;
+    --brand-dark:#0B3D6E; --brand-mid:#5B9BDD; --brand-light:#A9D3F5;
+    --verde:#2F9E58; --verde-bg:#E5F5EA; --amarillo:#B8860B; --amarillo-bg:#FBF1DC;
+    --rojo:#C0392B; --rojo-bg:#FBEAE8;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:var(--sans);background:var(--paper);color:var(--ink);}
+  .hidden{display:none !important;}
+
+  #loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .login-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:36px 32px;width:100%;max-width:360px;}
+  .login-card h1{font-size:19px;margin:0 0 4px;}
+  .login-card p{font-size:13px;color:var(--ink-soft);margin:0 0 20px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;}
+  .field input, .field select, .field textarea{
+    width:100%;font-family:var(--sans);font-size:13px;padding:9px 10px;border:1px solid var(--line-strong);border-radius:6px;background:var(--card);color:var(--ink);
+  }
+  .field textarea{resize:vertical;min-height:60px;}
+  .btn{font-family:var(--sans);font-size:13px;font-weight:500;padding:9px 16px;border-radius:6px;border:1px solid var(--line-strong);background:var(--card);color:var(--ink);cursor:pointer;white-space:nowrap;}
+  .btn:hover{background:#EEF5FC;}
+  .btn-primary{background:var(--brand-dark);color:#fff;border-color:var(--brand-dark);}
+  .btn-primary:hover{background:#164a82;}
+  .err{font-size:12px;color:var(--rojo);margin-top:8px;}
+
+  #appShell{display:flex;min-height:100vh;}
+  .sidebar{width:220px;background:var(--brand-dark);color:#fff;padding:20px 14px;flex-shrink:0;}
+  .sidebar .brand{font-size:15px;font-weight:700;margin-bottom:24px;padding-left:6px;}
+  .navitem{display:block;padding:9px 10px;border-radius:6px;font-size:13px;color:#D7D9E0;text-decoration:none;margin-bottom:2px;cursor:pointer;}
+  .navitem.active{background:rgba(255,255,255,0.12);color:#fff;font-weight:500;}
+  .main{flex:1;padding:26px 28px;max-width:1600px;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;}
+  .userbox{font-size:12px;color:var(--ink-soft);display:flex;align-items:center;gap:10px;}
+  .userbox .name{font-weight:600;color:var(--ink);cursor:pointer;}
+  .role-pill{font-size:10px;padding:2px 7px;border-radius:10px;background:#EFEDE3;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.03em;}
+  h1.pagetitle{font-size:22px;font-weight:600;margin:0 0 4px;}
+  .sub{font-size:13px;color:var(--ink-soft);margin:0 0 20px;}
+
+  .view.hidden{display:none;}
+  .module-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:24px;}
+  .module-card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:24px;cursor:pointer;transition:box-shadow 0.15s, transform 0.15s;}
+  .module-card:hover{box-shadow:0 4px 14px rgba(11,61,110,0.10);transform:translateY(-2px);}
+  .module-icon{font-size:26px;margin-bottom:10px;}
+  .module-card h3{font-size:15px;margin:0 0 6px;}
+  .module-card p{font-size:13px;color:var(--ink-soft);margin:0;}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px;}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px;}
+  .stat.clickable{cursor:pointer;transition:box-shadow 0.15s;}
+  .stat.clickable:hover{box-shadow:0 2px 10px rgba(11,61,110,0.10);}
+  .stat.stat-active{border-color:var(--brand-dark);box-shadow:0 0 0 2px rgba(11,61,110,0.15) inset;}
+  .stat .n{font-family:var(--mono);font-size:24px;font-weight:600;line-height:1;}
+  .stat .l{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;}
+  .toolbar select, .toolbar input[type=text]{font-family:var(--sans);font-size:13px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:6px;background:var(--card);color:var(--ink);}
+  .toolbar input[type=text]{flex:1;min-width:160px;}
+  .spacer{flex:1;}
+
+  .pers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:20px;}
+  .pers-card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px 18px;cursor:pointer;transition:box-shadow 0.15s, transform 0.15s;}
+  .pers-card.pers-baja{opacity:0.55;background:#F5F5F3;}
+  .baja-tag{font-size:9px;font-weight:700;background:#DDD;color:#666;padding:2px 6px;border-radius:8px;vertical-align:middle;}
+  .pers-card:hover{box-shadow:0 4px 14px rgba(11,61,110,0.10);transform:translateY(-2px);}
+  .pers-card h3{font-size:14px;margin:0 0 4px;}
+  .pers-card .sub2{font-size:11px;color:var(--ink-soft);margin-bottom:10px;}
+  .pers-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+  .pers-stats div{background:#F3F6FA;border-radius:5px;padding:5px 2px;text-align:center;}
+  .pers-stats .num{font-size:13px;font-weight:700;font-family:var(--mono);}
+  .pers-stats .lbl{font-size:9px;color:var(--ink-soft);text-transform:uppercase;}
+  .num-vencido{color:var(--rojo);}
+  .num-porvencer{color:var(--amarillo);}
+  .num-vigente{color:var(--verde);}
+
+  .table-wrap{background:var(--card);border:1px solid var(--line);border-radius:8px;overflow-x:auto;}
+  table{width:100%;min-width:600px;border-collapse:collapse;font-size:13px;}
+  thead th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);font-weight:600;padding:10px 12px;border-bottom:1px solid var(--line);background:#EEF5FC;}
+  tbody td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr{cursor:pointer;}
+  tbody tr:hover{background:#F7FAFD;}
+  tbody tr.row-vencido{background:#FDF2F1;}
+  tbody tr.row-vencido:hover{background:#FBEAE9;}
+  .estado-pill{display:inline-block;font-size:11px;font-weight:500;padding:3px 9px;border-radius:12px;border:1px solid var(--line-strong);color:var(--ink-soft);}
+  .estado-vencido{background:var(--rojo-bg);color:var(--rojo);border-color:transparent;}
+  .estado-porvencer{background:var(--amarillo-bg);color:var(--amarillo);border-color:transparent;}
+  .estado-vigente{background:var(--verde-bg);color:var(--verde);border-color:transparent;}
+  .estado-noaplica{background:#EEE;color:#999;border-color:transparent;}
+  .empty{padding:48px 20px;text-align:center;color:var(--ink-soft);font-size:14px;}
+
+  .overlay{position:fixed;inset:0;background:rgba(20,22,30,0.42);display:none;align-items:center;justify-content:center;z-index:50;padding:24px;}
+  .overlay.show{display:flex;}
+  .panel{width:640px;max-width:94vw;max-height:88vh;background:var(--paper);overflow-y:auto;padding:28px 32px;border-radius:12px;box-shadow:0 20px 60px rgba(11,61,110,0.25);}
+  .panel-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;}
+  .panel-header h2{font-size:17px;font-weight:600;margin:0;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .section-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--ink-soft);margin:20px 0 10px;padding-top:16px;border-top:1px solid var(--line);}
+  .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);}
+  .close-x{cursor:pointer;font-size:20px;color:var(--ink-soft);line-height:1;background:none;border:none;padding:2px 6px;}
+  .close-x:hover{color:var(--ink);}
+  .save-indicator{font-size:11px;color:var(--verde);height:14px;margin-top:6px;}
+  @media (max-width:800px){
+    .sidebar{width:64px;}
+    .sidebar .brand, .navitem span.txt{display:none;}
+    .module-grid{grid-template-columns:1fr;}
+    .row2{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>Control de Contratistas</h1>
+    <p>Ingresá con el usuario que te crearon.</p>
+    <div class="field"><label>Email</label><input type="text" id="loginEmail" autocomplete="username"></div>
+    <div class="field"><label>Contraseña</label><input type="password" id="loginPassword" autocomplete="current-password"></div>
+    <button class="btn btn-primary" id="btnLogin" style="width:100%;">Ingresar</button>
+    <div class="err hidden" id="loginError"></div>
+  </div>
+</div>
+
+<div id="appShell" class="hidden">
+  <div class="sidebar">
+    <div class="brand">🦺 Control de Contratistas</div>
+    <div class="navitem active" data-view="home" id="navHome"><span class="txt">Inicio</span></div>
+    <div class="navitem" data-view="personas" id="navPersonas"><span class="txt">Personas</span></div>
+  </div>
+  <div class="main">
+
+    <div id="view-home" class="view">
+      <h1 class="pagetitle">Bienvenido/a, <span id="homeUserName"></span></h1>
+      <p class="sub">Control de vencimientos de exámenes, cursos y accesos a planta.</p>
+      <div class="module-grid">
+        <div class="module-card" id="cardPersonas">
+          <div class="module-icon">🦺</div>
+          <h3>Personas</h3>
+          <p>Exámenes médicos, cursos, EPP y accesos a sitios de cliente por persona.</p>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-personas" class="view hidden">
+      <div class="topbar">
+        <div>
+          <h1 class="pagetitle">Personas</h1>
+          <p class="sub">Vencimientos de exámenes, cursos, EPP y accesos a sitios de cliente.</p>
+        </div>
+        <div class="userbox">
+          <span class="role-pill" id="rolePill">...</span>
+          <span class="name" id="userName">...</span>
+          <button class="btn" id="btnLogout">Salir</button>
+        </div>
+      </div>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="toolbar">
+        <input type="text" id="fBuscar" placeholder="Buscar por nombre, sector...">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft);white-space:nowrap;">
+          <input type="checkbox" id="chkMostrarBajas"> Mostrar dados de baja
+        </label>
+        <div class="spacer"></div>
+        <button class="btn" id="btnExport">Exportar CSV</button>
+        <button class="btn hidden" id="btnImport">Importar Excel</button>
+        <input type="file" id="fileImport" accept=".xlsx,.xls" class="hidden">
+        <button class="btn btn-primary hidden" id="btnNuevaPersona">+ Nueva persona</button>
+      </div>
+
+      <div id="personasGrid" class="pers-grid"></div>
+      <div class="empty hidden" id="emptyMsg">Todavía no hay personas cargadas.</div>
+
+      <div id="personaDetalleLista" class="hidden">
+        <button class="btn" id="btnVolverPersonas">← Volver a personas</button>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-top:16px;">
+          <div>
+            <h2 id="personaDetalleTitulo" style="font-size:17px;margin:0 0 4px;"></h2>
+            <p class="sub" id="personaDetalleSub" style="margin-bottom:0;"></p>
+          </div>
+          <button class="btn hidden" id="btnEditarPersona">Editar datos / estado</button>
+        </div>
+        <div class="toolbar" style="margin-top:14px;">
+          <div class="spacer"></div>
+          <button class="btn btn-primary hidden" id="btnAgregarDoc">+ Agregar documento/curso</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Tipo</th><th>Emisión</th><th>Vencimiento</th><th>Estado</th><th>Observaciones</th></tr></thead>
+            <tbody id="tbodyDocsPersona"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="overlay" id="overlay"><div class="panel" id="panel"></div></div>
+
+<datalist id="tipoDocList"></datalist>
+<datalist id="sectorList"></datalist>
+
+<script>
+/* ======================= CONFIG ======================= */
+const SUPABASE_URL = 'https://mhbzrcwawygxsxcaqvpe.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_-eBuZasBemCz2izx18lSdw_dN0wvV4r';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let session = null;
+let profile = null;
+let personas = [];
+let tiposDocumento = [];
+let documentos = [];
+let currentFilter = { buscar:'', quick:null };
+let personaActual = null;
+
+function canEdit(){ return profile && (profile.role === 'admin' || profile.role === 'editor'); }
+function canDelete(){ return profile && profile.role === 'admin'; }
+function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function formatDate(iso){
+  if(!iso) return '';
+  const parts = String(iso).slice(0,10).split('-');
+  if(parts.length!==3) return iso;
+  const [y,m,d] = parts;
+  return `${d}/${m}/${y}`;
+}
+
+/* ======================= AUTH ======================= */
+document.getElementById('btnLogin').addEventListener('click', doLogin);
+document.getElementById('loginPassword').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+
+async function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.classList.add('hidden');
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if(error){ errEl.textContent = 'No se pudo ingresar: ' + error.message; errEl.classList.remove('hidden'); return; }
+  await onLoggedIn(data.session);
+}
+
+document.getElementById('btnLogout').addEventListener('click', async ()=>{
+  await sb.auth.signOut();
+  location.reload();
+});
+
+async function onLoggedIn(sess){
+  session = sess;
+  const { data: prof } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+  profile = prof || { id: session.user.id, email: session.user.email, full_name:'', role:'lectura' };
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('appShell').classList.remove('hidden');
+  document.getElementById('userName').textContent = profile.full_name || profile.email;
+  document.getElementById('homeUserName').textContent = profile.full_name || profile.email;
+  document.getElementById('rolePill').textContent = profile.role;
+  document.getElementById('userName').title = 'Click para editar tu nombre';
+  document.getElementById('userName').addEventListener('click', editName);
+  if(canEdit()){
+    document.getElementById('btnNuevaPersona').classList.remove('hidden');
+    document.getElementById('btnImport').classList.remove('hidden');
+  }
+  showView('home');
+  await loadAll();
+  renderPersonas();
+  setInterval(async ()=>{
+    if(document.getElementById('overlay').classList.contains('show')) return;
+    await loadAll();
+    if(personaActual) abrirPersona(personaActual); else renderPersonas();
+  }, 20000);
+}
+
+async function editName(){
+  const nuevo = prompt('Tu nombre para mostrar:', profile.full_name || '');
+  if(nuevo === null) return;
+  profile.full_name = nuevo.trim();
+  document.getElementById('userName').textContent = profile.full_name || profile.email;
+  await sb.from('profiles').update({ full_name: profile.full_name }).eq('id', profile.id);
+}
+
+(async ()=>{
+  const { data } = await sb.auth.getSession();
+  if(data.session) await onLoggedIn(data.session);
+})();
+
+/* ======================= NAV ======================= */
+function showView(view){
+  document.getElementById('view-home').classList.toggle('hidden', view!=='home');
+  document.getElementById('view-personas').classList.toggle('hidden', view!=='personas');
+  document.getElementById('navHome').classList.toggle('active', view==='home');
+  document.getElementById('navPersonas').classList.toggle('active', view==='personas');
+}
+document.getElementById('navHome').addEventListener('click', ()=> showView('home'));
+document.getElementById('navPersonas').addEventListener('click', ()=> showView('personas'));
+document.getElementById('cardPersonas').addEventListener('click', ()=> showView('personas'));
+
+/* ======================= DATA ======================= */
+async function loadAll(){
+  const [{data: p}, {data: td}, {data: dp}] = await Promise.all([
+    sb.from('personas').select('*').order('nombre'),
+    sb.from('tipos_documento').select('*').order('nombre'),
+    sb.from('documentos_persona').select('*')
+  ]);
+  personas = p || [];
+  tiposDocumento = td || [];
+  documentos = dp || [];
+  document.getElementById('tipoDocList').innerHTML = tiposDocumento.map(t=>`<option value="${escapeHtml(t.nombre)}">`).join('');
+  document.getElementById('sectorList').innerHTML = [...new Set(personas.map(p=>p.sector).filter(Boolean))].map(s=>`<option value="${escapeHtml(s)}">`).join('');
+}
+
+function venceInfo(doc){
+  if(doc.no_aplica || !doc.fecha_vencimiento) return { estado:'no_aplica' };
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const venc = new Date(doc.fecha_vencimiento+'T00:00:00');
+  const diffDias = Math.round((venc-hoy)/86400000);
+  if(diffDias<0) return { estado:'vencido', diffDias };
+  if(diffDias<=30) return { estado:'porvencer', diffDias };
+  return { estado:'vigente', diffDias };
+}
+
+function docsDePersona(personaId){
+  return documentos.filter(d=>d.persona_id===personaId);
+}
+
+/* ======================= STATS + FILTER ======================= */
+function renderStats(){
+  const el = document.getElementById('stats');
+  const vencidos = documentos.filter(d=>venceInfo(d).estado==='vencido').length;
+  const porVencer = documentos.filter(d=>venceInfo(d).estado==='porvencer').length;
+  const vigentes = documentos.filter(d=>venceInfo(d).estado==='vigente').length;
+  const activeCls = (key) => currentFilter.quick===key ? ' stat-active' : '';
+  el.innerHTML = `
+    <div class="stat clickable${activeCls('vencido')}" data-quick="vencido"><div class="n" style="color:var(--rojo);">${vencidos}</div><div class="l">Vencidos</div></div>
+    <div class="stat clickable${activeCls('porvencer')}" data-quick="porvencer"><div class="n" style="color:var(--amarillo);">${porVencer}</div><div class="l">Por vencer (30 días)</div></div>
+    <div class="stat clickable${activeCls('vigente')}" data-quick="vigente"><div class="n" style="color:var(--verde);">${vigentes}</div><div class="l">Vigentes</div></div>
+    <div class="stat"><div class="n">${personas.length}</div><div class="l">Personas</div></div>`;
+  el.querySelectorAll('.stat[data-quick]').forEach(card=>{
+    card.addEventListener('click', ()=>{
+      const key = card.dataset.quick;
+      currentFilter.quick = (currentFilter.quick === key) ? null : key;
+      renderPersonas();
+    });
+  });
+}
+
+function personasFiltradas(){
+  let list = personas;
+  const mostrarBajas = document.getElementById('chkMostrarBajas').checked;
+  list = list.filter(p => mostrarBajas || p.activo!==false);
+  if(currentFilter.buscar){
+    const q = currentFilter.buscar.toLowerCase();
+    list = list.filter(p => `${p.nombre} ${p.sector} ${p.categoria}`.toLowerCase().includes(q));
+  }
+  if(currentFilter.quick){
+    list = list.filter(p => docsDePersona(p.id).some(d=> venceInfo(d).estado===currentFilter.quick));
+  }
+  return list;
+}
+
+/* ======================= RENDER PERSONAS ======================= */
+function renderPersonas(){
+  document.getElementById('personaDetalleLista').classList.add('hidden');
+  document.getElementById('personasGrid').classList.remove('hidden');
+  renderStats();
+  const list = personasFiltradas();
+  const grid = document.getElementById('personasGrid');
+  const emptyMsg = document.getElementById('emptyMsg');
+  if(list.length===0){ grid.innerHTML=''; emptyMsg.classList.remove('hidden'); return; }
+  emptyMsg.classList.add('hidden');
+
+  grid.innerHTML = list.map(p=>{
+    const docs = docsDePersona(p.id);
+    const vencidos = docs.filter(d=>venceInfo(d).estado==='vencido').length;
+    const porVencer = docs.filter(d=>venceInfo(d).estado==='porvencer').length;
+    const vigentes = docs.filter(d=>venceInfo(d).estado==='vigente').length;
+    const baja = p.activo===false;
+    return `
+      <div class="pers-card${baja?' pers-baja':''}" data-id="${p.id}">
+        <h3>${escapeHtml(p.nombre)} ${baja?'<span class="baja-tag">BAJA</span>':''}</h3>
+        <div class="sub2">${escapeHtml(p.sector||'—')}${p.categoria?' · '+escapeHtml(p.categoria):''}</div>
+        <div class="pers-stats">
+          <div><div class="num num-vencido">${vencidos}</div><div class="lbl">Vencidos</div></div>
+          <div><div class="num num-porvencer">${porVencer}</div><div class="lbl">Por vencer</div></div>
+          <div><div class="num num-vigente">${vigentes}</div><div class="lbl">Vigentes</div></div>
+        </div>
+      </div>`;
+  }).join('');
+  grid.querySelectorAll('.pers-card').forEach(card=>{
+    card.addEventListener('click', ()=> abrirPersona(card.dataset.id));
+  });
+}
+document.getElementById('fBuscar').addEventListener('input', e=>{ currentFilter.buscar = e.target.value; renderPersonas(); });
+document.getElementById('chkMostrarBajas').addEventListener('change', renderPersonas);
+document.getElementById('btnVolverPersonas').addEventListener('click', ()=>{ personaActual=null; renderPersonas(); });
+
+function abrirPersona(id){
+  personaActual = id;
+  const p = personas.find(x=>x.id===id); if(!p) return;
+  document.getElementById('personasGrid').classList.add('hidden');
+  document.getElementById('emptyMsg').classList.add('hidden');
+  document.getElementById('personaDetalleLista').classList.remove('hidden');
+  document.getElementById('personaDetalleTitulo').innerHTML = `${escapeHtml(p.nombre)} ${p.activo===false?'<span class="baja-tag">BAJA'+(p.fecha_baja?' · '+formatDate(p.fecha_baja):'')+'</span>':''}`;
+  document.getElementById('personaDetalleSub').textContent = `${p.sector||'—'}${p.categoria?' · '+p.categoria:''}${p.dni_cuil?' · DNI/CUIL: '+p.dni_cuil:''}`;
+  if(canEdit()){
+    document.getElementById('btnAgregarDoc').classList.remove('hidden');
+    document.getElementById('btnEditarPersona').classList.remove('hidden');
+  }
+
+  const docs = docsDePersona(id);
+  const tbody = document.getElementById('tbodyDocsPersona');
+  tbody.innerHTML = docs.map(d=>{
+    const tipo = tiposDocumento.find(t=>t.id===d.tipo_documento_id);
+    const v = venceInfo(d);
+    const estadoLabel = {vencido:'Vencido', porvencer:'Por vencer', vigente:'Vigente', no_aplica:'No aplica'}[v.estado];
+    const estadoCls = {vencido:'estado-vencido', porvencer:'estado-porvencer', vigente:'estado-vigente', no_aplica:'estado-noaplica'}[v.estado];
+    return `<tr data-id="${d.id}" class="${v.estado==='vencido'?'row-vencido':''}">
+      <td><b>${escapeHtml(tipo?tipo.nombre:'—')}</b></td>
+      <td>${formatDate(d.fecha_emision)||'—'}</td>
+      <td>${formatDate(d.fecha_vencimiento)||'—'}</td>
+      <td><span class="estado-pill ${estadoCls}">${estadoLabel}</span></td>
+      <td>${escapeHtml((d.observaciones||'').slice(0,60))}</td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    tr.addEventListener('click', ()=> openDocDetail(tr.dataset.id));
+  });
+}
+
+/* ======================= DETALLE DE UN DOCUMENTO/CURSO ======================= */
+function openDocDetail(id){
+  const d = documentos.find(x=>x.id===id); if(!d) return;
+  const tipo = tiposDocumento.find(t=>t.id===d.tipo_documento_id);
+  const ro = !canEdit();
+  const panel = document.getElementById('panel');
+  panel.innerHTML = `
+    <div class="panel-header"><h2>${escapeHtml(tipo?tipo.nombre:'Documento')}</h2><button class="close-x" id="closeBtn">&times;</button></div>
+    <div class="row2">
+      <div class="field"><label>Fecha de emisión</label><input type="date" id="dd-emision" value="${d.fecha_emision||''}" ${ro?'disabled':''}></div>
+      <div class="field"><label>Fecha de vencimiento</label><input type="date" id="dd-vencimiento" value="${d.fecha_vencimiento||''}" ${ro?'disabled':''}></div>
+    </div>
+    <div class="field"><label><input type="checkbox" id="dd-noaplica" ${d.no_aplica?'checked':''} ${ro?'disabled':''}> No aplica a esta persona</label></div>
+    <div class="row2">
+      <div class="field"><label>Responsable</label><input type="text" id="dd-responsable" value="${escapeHtml(d.responsable||'')}" ${ro?'disabled':''}></div>
+    </div>
+    <div class="field"><label>Observaciones</label><textarea id="dd-observaciones" ${ro?'disabled':''}>${escapeHtml(d.observaciones||'')}</textarea></div>
+    <div class="save-indicator" id="saveIndicator"></div>
+    ${canDelete() ? `<div class="modal-actions"><button class="btn" id="btnDeleteDoc" style="color:var(--rojo);">Eliminar registro</button></div>` : ''}
+  `;
+  document.getElementById('closeBtn').addEventListener('click', closeOverlay);
+  if(!ro){
+    const guardar = async ()=>{
+      d.fecha_emision = document.getElementById('dd-emision').value || null;
+      d.fecha_vencimiento = document.getElementById('dd-vencimiento').value || null;
+      d.no_aplica = document.getElementById('dd-noaplica').checked;
+      d.responsable = document.getElementById('dd-responsable').value.trim();
+      d.observaciones = document.getElementById('dd-observaciones').value.trim();
+      await sb.from('documentos_persona').update({
+        fecha_emision: d.fecha_emision, fecha_vencimiento: d.fecha_vencimiento,
+        no_aplica: d.no_aplica, responsable: d.responsable, observaciones: d.observaciones
+      }).eq('id', d.id);
+      abrirPersona(personaActual);
+      flashSaved();
+    };
+    ['dd-emision','dd-vencimiento','dd-noaplica'].forEach(id2=> document.getElementById(id2).addEventListener('change', guardar));
+    ['dd-responsable','dd-observaciones'].forEach(id2=> document.getElementById(id2).addEventListener('blur', guardar));
+    if(document.getElementById('btnDeleteDoc')){
+      document.getElementById('btnDeleteDoc').addEventListener('click', async ()=>{
+        if(!confirm('¿Eliminar este registro? No se puede deshacer.')) return;
+        await sb.from('documentos_persona').delete().eq('id', d.id);
+        documentos = documentos.filter(x=>x.id!==d.id);
+        closeOverlay(); abrirPersona(personaActual);
+      });
+    }
+  }
+  document.getElementById('overlay').classList.add('show');
+}
+function closeOverlay(){ document.getElementById('overlay').classList.remove('show'); }
+document.getElementById('overlay').addEventListener('click', e=>{ if(e.target.id==='overlay') closeOverlay(); });
+
+function flashSaved(){
+  const ind = document.getElementById('saveIndicator'); if(!ind) return;
+  ind.textContent='Guardado'; setTimeout(()=>{ if(ind) ind.textContent=''; }, 1500);
+}
+
+/* ======================= AGREGAR DOCUMENTO A PERSONA ======================= */
+document.getElementById('btnEditarPersona').addEventListener('click', ()=>{
+  const p = personas.find(x=>x.id===personaActual); if(!p) return;
+  const panel = document.getElementById('panel');
+  panel.innerHTML = `
+    <div class="panel-header"><h2>Editar ${escapeHtml(p.nombre)}</h2><button class="close-x" id="closeBtn">&times;</button></div>
+    <div class="field"><label>Nombre</label><input type="text" id="ep-nombre" value="${escapeHtml(p.nombre)}"></div>
+    <div class="row2">
+      <div class="field"><label>DNI/CUIL</label><input type="text" id="ep-dni" value="${escapeHtml(p.dni_cuil||'')}"></div>
+      <div class="field"><label>Sector</label><input type="text" id="ep-sector" list="sectorList" value="${escapeHtml(p.sector||'')}"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Categoría</label><input type="text" id="ep-categoria" value="${escapeHtml(p.categoria||'')}"></div>
+      <div class="field"><label>Teléfono</label><input type="text" id="ep-telefono" value="${escapeHtml(p.telefono||'')}"></div>
+    </div>
+    <div class="field"><label>Email</label><input type="text" id="ep-email" value="${escapeHtml(p.email||'')}"></div>
+    <div class="section-title">Estado</div>
+    <div class="field"><label>Situación</label>
+      <select id="ep-activo">
+        <option value="true" ${p.activo!==false?'selected':''}>Activo</option>
+        <option value="false" ${p.activo===false?'selected':''}>Dado de baja</option>
+      </select>
+    </div>
+    <div class="field" id="ep-fechabaja-wrap" style="${p.activo===false?'':'display:none;'}">
+      <label>Fecha de baja</label><input type="date" id="ep-fechabaja" value="${p.fecha_baja||''}">
+    </div>
+    <div class="save-indicator" id="saveIndicator"></div>
+    ${canDelete() ? `<div class="modal-actions"><button class="btn" id="btnDeletePersona" style="color:var(--rojo);">Eliminar persona</button></div>` : ''}
+  `;
+  document.getElementById('closeBtn').addEventListener('click', closeOverlay);
+  document.getElementById('ep-activo').addEventListener('change', (e)=>{
+    document.getElementById('ep-fechabaja-wrap').style.display = e.target.value==='false' ? '' : 'none';
+  });
+  const guardar = async ()=>{
+    p.nombre = document.getElementById('ep-nombre').value.trim();
+    p.dni_cuil = document.getElementById('ep-dni').value.trim();
+    p.sector = document.getElementById('ep-sector').value.trim();
+    p.categoria = document.getElementById('ep-categoria').value.trim();
+    p.telefono = document.getElementById('ep-telefono').value.trim();
+    p.email = document.getElementById('ep-email').value.trim();
+    p.activo = document.getElementById('ep-activo').value === 'true';
+    p.fecha_baja = p.activo ? null : (document.getElementById('ep-fechabaja').value || null);
+    await sb.from('personas').update({
+      nombre:p.nombre, dni_cuil:p.dni_cuil, sector:p.sector, categoria:p.categoria,
+      telefono:p.telefono, email:p.email, activo:p.activo, fecha_baja:p.fecha_baja
+    }).eq('id', p.id);
+    abrirPersona(personaActual);
+    flashSaved();
+  };
+  ['ep-nombre','ep-dni','ep-sector','ep-categoria','ep-telefono','ep-email'].forEach(id2=> document.getElementById(id2).addEventListener('blur', guardar));
+  document.getElementById('ep-activo').addEventListener('change', guardar);
+  document.getElementById('ep-fechabaja').addEventListener('change', guardar);
+  if(document.getElementById('btnDeletePersona')){
+    document.getElementById('btnDeletePersona').addEventListener('click', async ()=>{
+      if(!confirm(`¿Eliminar a ${p.nombre} y todos sus documentos cargados? No se puede deshacer.`)) return;
+      await sb.from('personas').delete().eq('id', p.id);
+      personas = personas.filter(x=>x.id!==p.id);
+      documentos = documentos.filter(x=>x.persona_id!==p.id);
+      closeOverlay(); personaActual=null; renderPersonas();
+    });
+  }
+  document.getElementById('overlay').classList.add('show');
+});
+
+document.getElementById('btnAgregarDoc').addEventListener('click', ()=>{
+  const panel = document.getElementById('panel');
+  panel.innerHTML = `
+    <div class="panel-header"><h2>Agregar documento/curso</h2><button class="close-x" id="closeBtn">&times;</button></div>
+    <div class="field"><label>Tipo de documento/curso</label><input type="text" id="ad-tipo" list="tipoDocList" placeholder="Elegí uno existente o escribí uno nuevo"></div>
+    <div class="row2">
+      <div class="field"><label>Fecha de emisión</label><input type="date" id="ad-emision"></div>
+      <div class="field"><label>Fecha de vencimiento</label><input type="date" id="ad-vencimiento"></div>
+    </div>
+    <div class="field"><label><input type="checkbox" id="ad-noaplica"> No aplica a esta persona</label></div>
+    <div class="err hidden" id="ad-err">Elegí o escribí un tipo de documento.</div>
+    <div class="modal-actions"><button class="btn" id="cancelAdBtn">Cancelar</button><button class="btn btn-primary" id="btnCrearDoc">Agregar</button></div>
+  `;
+  document.getElementById('closeBtn').addEventListener('click', closeOverlay);
+  document.getElementById('cancelAdBtn').addEventListener('click', closeOverlay);
+  document.getElementById('btnCrearDoc').addEventListener('click', async ()=>{
+    const nombreTipo = document.getElementById('ad-tipo').value.trim();
+    if(!nombreTipo){ document.getElementById('ad-err').classList.remove('hidden'); return; }
+    let tipo = tiposDocumento.find(t=>t.nombre.toLowerCase()===nombreTipo.toLowerCase());
+    if(!tipo){
+      const { data, error } = await sb.from('tipos_documento').insert({ nombre: nombreTipo }).select().single();
+      if(error){ alert('No se pudo crear el tipo: ' + error.message); return; }
+      tipo = data; tiposDocumento.push(tipo);
+    }
+    const nuevo = {
+      persona_id: personaActual, tipo_documento_id: tipo.id,
+      fecha_emision: document.getElementById('ad-emision').value || null,
+      fecha_vencimiento: document.getElementById('ad-vencimiento').value || null,
+      no_aplica: document.getElementById('ad-noaplica').checked
+    };
+    const { data, error } = await sb.from('documentos_persona').insert(nuevo).select().single();
+    if(error){ alert('No se pudo agregar: ' + error.message); return; }
+    documentos.push(data);
+    closeOverlay(); abrirPersona(personaActual);
+  });
+  document.getElementById('overlay').classList.add('show');
+});
+
+/* ======================= NUEVA PERSONA ======================= */
+document.getElementById('btnNuevaPersona').addEventListener('click', ()=>{
+  const panel = document.getElementById('panel');
+  panel.innerHTML = `
+    <div class="panel-header"><h2>Nueva persona</h2><button class="close-x" id="closeBtn">&times;</button></div>
+    <div class="field"><label>Nombre</label><input type="text" id="np-nombre" placeholder="Nombre y apellido"></div>
+    <div class="row2">
+      <div class="field"><label>DNI/CUIL</label><input type="text" id="np-dni"></div>
+      <div class="field"><label>Sector</label><input type="text" id="np-sector" list="sectorList"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Categoría</label><input type="text" id="np-categoria" placeholder="Ej: Oficial, Medio Oficial..."></div>
+      <div class="field"><label>Teléfono</label><input type="text" id="np-telefono"></div>
+    </div>
+    <div class="field"><label>Email</label><input type="text" id="np-email"></div>
+    <div class="err hidden" id="np-err">Completá al menos el nombre.</div>
+    <div class="modal-actions"><button class="btn" id="cancelNpBtn">Cancelar</button><button class="btn btn-primary" id="btnCrearPersona">Crear</button></div>
+  `;
+  document.getElementById('closeBtn').addEventListener('click', closeOverlay);
+  document.getElementById('cancelNpBtn').addEventListener('click', closeOverlay);
+  document.getElementById('btnCrearPersona').addEventListener('click', async ()=>{
+    const nombre = document.getElementById('np-nombre').value.trim();
+    if(!nombre){ document.getElementById('np-err').classList.remove('hidden'); return; }
+    const nueva = {
+      nombre,
+      dni_cuil: document.getElementById('np-dni').value.trim(),
+      sector: document.getElementById('np-sector').value.trim(),
+      categoria: document.getElementById('np-categoria').value.trim(),
+      telefono: document.getElementById('np-telefono').value.trim(),
+      email: document.getElementById('np-email').value.trim()
+    };
+    const { data, error } = await sb.from('personas').insert(nueva).select().single();
+    if(error){ alert('No se pudo crear: ' + error.message); return; }
+    personas.push(data);
+    closeOverlay(); renderPersonas();
+  });
+  document.getElementById('overlay').classList.add('show');
+});
+
+/* ======================= EXPORTAR CSV ======================= */
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  const headers = ['Persona','Sector','Categoría','Tipo','Fecha emisión','Fecha vencimiento','Estado','Responsable','Observaciones'];
+  const rows = [];
+  personasFiltradas().forEach(p=>{
+    docsDePersona(p.id).forEach(d=>{
+      const tipo = tiposDocumento.find(t=>t.id===d.tipo_documento_id);
+      const v = venceInfo(d);
+      const estadoLabel = {vencido:'Vencido', porvencer:'Por vencer', vigente:'Vigente', no_aplica:'No aplica'}[v.estado];
+      rows.push([p.nombre,p.sector,p.categoria,tipo?tipo.nombre:'',formatDate(d.fecha_emision),formatDate(d.fecha_vencimiento),estadoLabel,d.responsable,d.observaciones]
+        .map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(','));
+    });
+  });
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='control_contratistas.csv'; a.click();
+  URL.revokeObjectURL(url);
+});
+
+/* ======================= IMPORTAR EXCEL (genérico, opcional) ======================= */
+document.getElementById('btnImport').addEventListener('click', ()=> document.getElementById('fileImport').click());
+document.getElementById('fileImport').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  alert('El importador de tu Excel real ya fue procesado por separado (migración inicial). Esta opción queda disponible para futuras cargas masivas si hace falta.');
+  e.target.value = '';
+});
+</script>
+</body>
+</html>

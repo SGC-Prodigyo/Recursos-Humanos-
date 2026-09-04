@@ -144,7 +144,7 @@
   .estado-inline.estado-vigente{background:var(--verde-bg);color:var(--verde);}
   .estado-inline.estado-porvencer{background:var(--amarillo-bg);color:var(--amarillo);}
   .estado-inline.estado-cerrada-pill{background:#EEE;color:#777;}
-  .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;}
   .dash-card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;}
   .dash-card h3{font-size:14px;margin:0 0 16px;}
   .pie-wrap{display:flex;align-items:center;gap:24px;flex-wrap:wrap;}
@@ -197,9 +197,9 @@
 <div id="appShell" class="hidden">
   <div class="sidebar">
     <div class="brand"><img src="logo-prodigyo.jpg" alt="Prodigyo"></div>
-    <div class="brand-sub">🦺 Control de Contratistas</div>
+    <div class="brand-sub">🦺 Gestión de las personas</div>
     <div class="navitem active" data-view="home" id="navHome"><span class="txt">Inicio</span></div>
-    <div class="navitem" data-view="personas" id="navPersonas"><span class="txt">Control de Contratistas</span></div>
+    <div class="navitem" data-view="personas" id="navPersonas"><span class="txt">Gestión de las personas</span></div>
   </div>
   <div class="main">
 
@@ -209,8 +209,8 @@
       <div class="module-grid">
         <div class="module-card" id="cardPersonas">
           <div class="module-icon">🦺</div>
-          <h3>Control de Contratistas</h3>
-          <p>Exámenes médicos, cursos, EPP y accesos a sitios de cliente por persona.</p>
+          <h3>Gestión de las personas</h3>
+          <p>Ingreso del personal a planta y control de empresas contratistas.</p>
         </div>
       </div>
     </div>
@@ -227,6 +227,12 @@
         </div>
       </div>
 
+      <div class="tabs" style="margin-bottom:10px;">
+        <button class="tab-btn active" id="subtabIngreso">Ingreso del personal</button>
+        <button class="tab-btn" id="subtabEmpresas">Empresas</button>
+      </div>
+
+      <div id="submod-ingreso">
       <div class="cat-panels" id="catPanels"></div>
 
       <div class="tabs">
@@ -302,8 +308,16 @@
           </table>
         </div>
       </div>
-    </div>
+      </div>
 
+      <div id="submod-empresas" class="hidden">
+        <div class="empty" style="padding:60px 20px;">
+          <p style="font-size:15px;">🏢 Próximamente</p>
+          <p style="font-size:13px;">Acá vamos a trabajar el control de empresas contratistas, a partir de otro Excel.</p>
+        </div>
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -648,6 +662,19 @@ document.getElementById('fEstadoPersona').addEventListener('change', renderPerso
 document.getElementById('btnVolverPersonas').addEventListener('click', ()=>{ personaActual=null; renderPersonas(); });
 
 /* ======================= DASHBOARD (tortas) ======================= */
+document.getElementById('subtabIngreso').addEventListener('click', ()=>{
+  document.getElementById('submod-ingreso').classList.remove('hidden');
+  document.getElementById('submod-empresas').classList.add('hidden');
+  document.getElementById('subtabIngreso').classList.add('active');
+  document.getElementById('subtabEmpresas').classList.remove('active');
+});
+document.getElementById('subtabEmpresas').addEventListener('click', ()=>{
+  document.getElementById('submod-ingreso').classList.add('hidden');
+  document.getElementById('submod-empresas').classList.remove('hidden');
+  document.getElementById('subtabIngreso').classList.remove('active');
+  document.getElementById('subtabEmpresas').classList.add('active');
+});
+
 document.getElementById('tabBtnListado').addEventListener('click', renderPersonas);
 document.getElementById('tabBtnDash').addEventListener('click', renderDashboard);
 
@@ -697,6 +724,22 @@ function renderDashboard(){
   });
 
   const el = document.getElementById('tab-dash');
+  const sectorPies = porSector.map(s=>{
+    const pie = conicPie([{value:s.vg, color:'var(--verde)'},{value:s.pv, color:'var(--amarillo)'},{value:s.v, color:'var(--rojo)'}]);
+    return `
+      <div class="dash-card">
+        <h3>${escapeHtml(s.sec)}</h3>
+        <div class="pie-wrap">
+          <div class="pie" style="background:${pie};"></div>
+          <div class="pie-legend">
+            <div class="row"><span class="sw" style="background:var(--verde);"></span> Vigentes <span class="val">${s.vg} (${Math.round(s.vg/s.tot*100)}%)</span></div>
+            <div class="row"><span class="sw" style="background:var(--amarillo);"></span> Por vencer <span class="val">${s.pv} (${Math.round(s.pv/s.tot*100)}%)</span></div>
+            <div class="row"><span class="sw" style="background:var(--rojo);"></span> Vencidos <span class="val">${s.v} (${Math.round(s.v/s.tot*100)}%)</span></div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
   el.innerHTML = `
     <div class="dash-grid">
       <div class="dash-card">
@@ -721,22 +764,7 @@ function renderDashboard(){
           </div>
         </div>
       </div>
-    </div>
-    <div class="dash-card" style="margin-top:16px;">
-      <h3>Estado de documentación por sector</h3>
-      <div class="sector-bars">
-        ${porSector.map(s=>`
-          <div class="sector-bar-row">
-            <div class="sector-bar-label">${escapeHtml(s.sec)}</div>
-            <div class="sector-bar-track">
-              ${s.vg?`<div style="width:${s.vg/s.tot*100}%;background:var(--verde);"></div>`:''}
-              ${s.pv?`<div style="width:${s.pv/s.tot*100}%;background:var(--amarillo);"></div>`:''}
-              ${s.v?`<div style="width:${s.v/s.tot*100}%;background:var(--rojo);"></div>`:''}
-            </div>
-            <div class="sector-bar-nums"><span style="color:var(--verde);">${s.vg}</span> · <span style="color:var(--amarillo);">${s.pv}</span> · <span style="color:var(--rojo);">${s.v}</span></div>
-          </div>`).join('')}
-      </div>
-      <p class="sub" style="margin-top:10px;margin-bottom:0;">Vigentes · Por vencer · Vencidos</p>
+      ${sectorPies}
     </div>
   `;
 }
@@ -790,7 +818,6 @@ function abrirPersona(id){
   document.getElementById('personaDetalleTitulo').innerHTML = `${escapeHtml(p.nombre)} <span class="estado-pill ${badgeCls}">${est}</span>${p.fecha_baja && est==='Baja' ? ` <span style="font-size:11px;color:var(--ink-soft);">(${formatDate(p.fecha_baja)})</span>` : ''}`;
   document.getElementById('personaDetalleSub').textContent = `${p.sector||'—'}${p.categoria?' · '+p.categoria:''}${p.dni_cuil?' · DNI/CUIL: '+p.dni_cuil:''}`;
   if(canEdit()){
-    document.getElementById('btnAgregarDoc').classList.remove('hidden');
     document.getElementById('btnEditarPersona').classList.remove('hidden');
   }
   if(canDelete()){
@@ -807,14 +834,20 @@ function abrirPersona(id){
     };
   }
 
-  const docs = docsDePersona(id);
+  const docsExistentes = docsDePersona(id);
+  const docsCompletos = tiposDocumento.map(tipo=>{
+    const existente = docsExistentes.find(d=>d.tipo_documento_id===tipo.id);
+    return existente || { id:null, persona_id:id, tipo_documento_id:tipo.id, fecha_emision:null, fecha_vencimiento:null, no_aplica:false };
+  });
   const tbody = document.getElementById('tbodyDocsPersona');
-  tbody.innerHTML = docs.map(d=>{
+  tbody.innerHTML = docsCompletos.map(d=>{
     const tipo = tiposDocumento.find(t=>t.id===d.tipo_documento_id);
     const v = venceInfo(d);
-    const estadoLabel = {vencido:'Vencido', porvencer:'Por vencer', vigente:'Vigente', no_aplica:'No aplica'}[v.estado];
-    const estadoCls = {vencido:'estado-vencido', porvencer:'estado-porvencer', vigente:'estado-vigente', no_aplica:'estado-noaplica'}[v.estado];
-    return `<tr data-id="${d.id}" class="${v.estado==='vencido'?'row-vencido':''}">
+    let estadoLabel, estadoCls;
+    if(d.no_aplica){ estadoLabel='No aplica'; estadoCls='estado-noaplica'; }
+    else if(!d.fecha_vencimiento){ estadoLabel='Sin cargar'; estadoCls='estado-noaplica'; }
+    else { estadoLabel = {vencido:'Vencido', porvencer:'Por vencer', vigente:'Vigente'}[v.estado]; estadoCls = {vencido:'estado-vencido', porvencer:'estado-porvencer', vigente:'estado-vigente'}[v.estado]; }
+    return `<tr data-id="${d.id||''}" data-tipo="${tipo.id}" class="${v.estado==='vencido'?'row-vencido':''}">
       <td><b>${escapeHtml(tipo?tipo.nombre:'—')}</b></td>
       <td>${formatDate(d.fecha_emision)||'—'}</td>
       <td>${formatDate(d.fecha_vencimiento)||'—'}</td>
@@ -822,13 +855,15 @@ function abrirPersona(id){
     </tr>`;
   }).join('');
   tbody.querySelectorAll('tr').forEach(tr=>{
-    tr.addEventListener('click', ()=> openDocDetail(tr.dataset.id));
+    tr.addEventListener('click', ()=> openDocDetail(tr.dataset.id || null, tr.dataset.tipo, id));
   });
 }
 
 /* ======================= DETALLE DE UN DOCUMENTO/CURSO ======================= */
-function openDocDetail(id){
-  const d = documentos.find(x=>x.id===id); if(!d) return;
+function openDocDetail(id, tipoId, personaId){
+  let d = id ? documentos.find(x=>x.id===id) : null;
+  const esNuevo = !d;
+  if(!d) d = { id:null, persona_id:personaId, tipo_documento_id:tipoId, fecha_emision:null, fecha_vencimiento:null, no_aplica:false };
   const tipo = tiposDocumento.find(t=>t.id===d.tipo_documento_id);
   const ro = !canEdit();
   const panel = document.getElementById('panel');
@@ -838,9 +873,9 @@ function openDocDetail(id){
       <div class="field"><label>Fecha de carga</label><input type="date" id="dd-emision" value="${d.fecha_emision||''}" ${ro?'disabled':''}></div>
       <div class="field"><label>Fecha de vencimiento</label><input type="date" id="dd-vencimiento" value="${d.fecha_vencimiento||''}" ${ro?'disabled':''}></div>
     </div>
-    <div class="field"><label><input type="checkbox" id="dd-noaplica" ${d.no_aplica?'checked':''} ${ro?'disabled':''}> No aplica a esta persona</label></div>
+    <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--ink);"><input type="checkbox" id="dd-noaplica" ${d.no_aplica?'checked':''} ${ro?'disabled':''}> No aplica a esta persona</label></div>
     <div class="save-indicator" id="saveIndicator"></div>
-    ${canDelete() ? `<div class="modal-actions"><button class="btn" id="btnDeleteDoc" style="color:var(--rojo);">Eliminar registro</button></div>` : ''}
+    ${(canDelete() && !esNuevo) ? `<div class="modal-actions"><button class="btn" id="btnDeleteDoc" style="color:var(--rojo);">Eliminar registro</button></div>` : ''}
   `;
   document.getElementById('closeBtn').addEventListener('click', closeOverlay);
   if(!ro){
@@ -848,10 +883,19 @@ function openDocDetail(id){
       d.fecha_emision = document.getElementById('dd-emision').value || null;
       d.fecha_vencimiento = document.getElementById('dd-vencimiento').value || null;
       d.no_aplica = document.getElementById('dd-noaplica').checked;
-      await sb.from('documentos_persona').update({
-        fecha_emision: d.fecha_emision, fecha_vencimiento: d.fecha_vencimiento,
-        no_aplica: d.no_aplica
-      }).eq('id', d.id);
+      if(d.id){
+        await sb.from('documentos_persona').update({
+          fecha_emision: d.fecha_emision, fecha_vencimiento: d.fecha_vencimiento, no_aplica: d.no_aplica
+        }).eq('id', d.id);
+      } else {
+        const { data, error } = await sb.from('documentos_persona').insert({
+          persona_id: d.persona_id, tipo_documento_id: d.tipo_documento_id,
+          fecha_emision: d.fecha_emision, fecha_vencimiento: d.fecha_vencimiento, no_aplica: d.no_aplica
+        }).select().single();
+        if(error){ alert('No se pudo guardar: ' + error.message); return; }
+        d = data;
+        documentos.push(d);
+      }
       abrirPersona(personaActual);
       flashSaved();
     };
@@ -949,7 +993,7 @@ document.getElementById('btnAgregarDoc').addEventListener('click', ()=>{
       <div class="field"><label>Fecha de emisión</label><input type="date" id="ad-emision"></div>
       <div class="field"><label>Fecha de vencimiento</label><input type="date" id="ad-vencimiento"></div>
     </div>
-    <div class="field"><label><input type="checkbox" id="ad-noaplica"> No aplica a esta persona</label></div>
+    <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--ink);"><input type="checkbox" id="ad-noaplica"> No aplica a esta persona</label></div>
     <div class="err hidden" id="ad-err">Elegí o escribí un tipo de documento.</div>
     <div class="modal-actions"><button class="btn" id="cancelAdBtn">Cancelar</button><button class="btn btn-primary" id="btnCrearDoc">Agregar</button></div>
   `;

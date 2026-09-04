@@ -197,20 +197,32 @@
 <div id="appShell" class="hidden">
   <div class="sidebar">
     <div class="brand"><img src="logo-prodigyo.jpg" alt="Prodigyo"></div>
-    <div class="brand-sub">🦺 Gestión de las personas</div>
+    <div class="brand-sub">🗂️ ADMINISTRACIÓN</div>
     <div class="navitem active" data-view="home" id="navHome"><span class="txt">Inicio</span></div>
-    <div class="navitem" data-view="personas" id="navPersonas"><span class="txt">Gestión de las personas</span></div>
+    <div class="navitem" data-view="personas" id="navPersonas"><span class="txt">Control Contratistas</span></div>
+    <div class="navitem" data-view="siniestros" id="navSiniestros"><span class="txt">Siniestros ART</span></div>
+    <div class="navitem" data-view="proveedores" id="navProveedores"><span class="txt">Pago a proveedores</span></div>
   </div>
   <div class="main">
 
     <div id="view-home" class="view">
       <h1 class="pagetitle">Bienvenido/a, <span id="homeUserName"></span></h1>
-      <p class="sub">Control de vencimientos de exámenes, cursos y accesos a planta.</p>
+      <p class="sub">Módulos de administración de Prodigyo.</p>
       <div class="module-grid">
         <div class="module-card" id="cardPersonas">
           <div class="module-icon">🦺</div>
-          <h3>Gestión de las personas</h3>
-          <p>Ingreso del personal a planta y control de empresas contratistas.</p>
+          <h3>Control Contratistas</h3>
+          <p>Exámenes médicos, cursos, EPP y accesos a sitios de cliente por persona.</p>
+        </div>
+        <div class="module-card" id="cardSiniestros">
+          <div class="module-icon">🚑</div>
+          <h3>Siniestros ART</h3>
+          <p>Próximamente: gestión de siniestros laborales.</p>
+        </div>
+        <div class="module-card" id="cardProveedores">
+          <div class="module-icon">💳</div>
+          <h3>Pago a proveedores</h3>
+          <p>Próximamente: control de pagos a proveedores.</p>
         </div>
       </div>
     </div>
@@ -227,17 +239,12 @@
         </div>
       </div>
 
-      <div class="tabs" style="margin-bottom:10px;">
-        <button class="tab-btn active" id="subtabIngreso">Ingreso del personal</button>
-        <button class="tab-btn" id="subtabEmpresas">Empresas</button>
-      </div>
-
-      <div id="submod-ingreso">
       <div class="cat-panels" id="catPanels"></div>
 
       <div class="tabs">
         <button class="tab-btn active" id="tabBtnListado">Listado</button>
         <button class="tab-btn" id="tabBtnDash">Dashboard</button>
+        <button class="tab-btn" id="tabBtnEmpresasCC">Empresas</button>
       </div>
 
       <div id="tab-listado">
@@ -308,9 +315,8 @@
           </table>
         </div>
       </div>
-      </div>
 
-      <div id="submod-empresas" class="hidden">
+      <div id="tab-empresas" class="hidden">
         <div class="empty" style="padding:60px 20px;">
           <p style="font-size:15px;">🏢 Próximamente</p>
           <p style="font-size:13px;">Acá vamos a trabajar el control de empresas contratistas, a partir de otro Excel.</p>
@@ -318,6 +324,43 @@
       </div>
 
     </div>
+
+    <div id="view-siniestros" class="view hidden">
+      <div class="topbar">
+        <div>
+          <h1 class="pagetitle">Siniestros ART</h1>
+          <p class="sub">Gestión de siniestros laborales.</p>
+        </div>
+        <div class="userbox">
+          <span class="role-pill" id="rolePillSin">...</span>
+          <span class="name" id="userNameSin">...</span>
+          <button class="btn" id="btnLogoutSin">Salir</button>
+        </div>
+      </div>
+      <div class="empty" style="padding:60px 20px;">
+        <p style="font-size:15px;">🚑 Próximamente</p>
+        <p style="font-size:13px;">Este módulo todavía no está armado. Avisame cuándo querés que lo construyamos.</p>
+      </div>
+    </div>
+
+    <div id="view-proveedores" class="view hidden">
+      <div class="topbar">
+        <div>
+          <h1 class="pagetitle">Pago a proveedores</h1>
+          <p class="sub">Control de pagos a proveedores.</p>
+        </div>
+        <div class="userbox">
+          <span class="role-pill" id="rolePillProv">...</span>
+          <span class="name" id="userNameProv">...</span>
+          <button class="btn" id="btnLogoutProv">Salir</button>
+        </div>
+      </div>
+      <div class="empty" style="padding:60px 20px;">
+        <p style="font-size:15px;">💳 Próximamente</p>
+        <p style="font-size:13px;">Este módulo todavía no está armado. Avisame cuándo querés que lo construyamos.</p>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -381,6 +424,10 @@ async function onLoggedIn(sess){
   document.getElementById('userName').textContent = profile.full_name || profile.email;
   document.getElementById('homeUserName').textContent = profile.full_name || profile.email;
   document.getElementById('rolePill').textContent = profile.role;
+  document.getElementById('userNameSin').textContent = profile.full_name || profile.email;
+  document.getElementById('rolePillSin').textContent = profile.role;
+  document.getElementById('userNameProv').textContent = profile.full_name || profile.email;
+  document.getElementById('rolePillProv').textContent = profile.role;
   document.getElementById('userName').title = 'Click para editar tu nombre';
   document.getElementById('userName').addEventListener('click', editName);
   if(canEdit()){
@@ -415,12 +462,22 @@ async function editName(){
 function showView(view){
   document.getElementById('view-home').classList.toggle('hidden', view!=='home');
   document.getElementById('view-personas').classList.toggle('hidden', view!=='personas');
+  document.getElementById('view-siniestros').classList.toggle('hidden', view!=='siniestros');
+  document.getElementById('view-proveedores').classList.toggle('hidden', view!=='proveedores');
   document.getElementById('navHome').classList.toggle('active', view==='home');
   document.getElementById('navPersonas').classList.toggle('active', view==='personas');
+  document.getElementById('navSiniestros').classList.toggle('active', view==='siniestros');
+  document.getElementById('navProveedores').classList.toggle('active', view==='proveedores');
 }
 document.getElementById('navHome').addEventListener('click', ()=> showView('home'));
 document.getElementById('navPersonas').addEventListener('click', ()=> showView('personas'));
 document.getElementById('cardPersonas').addEventListener('click', ()=> showView('personas'));
+document.getElementById('navSiniestros').addEventListener('click', ()=> showView('siniestros'));
+document.getElementById('cardSiniestros').addEventListener('click', ()=> showView('siniestros'));
+document.getElementById('navProveedores').addEventListener('click', ()=> showView('proveedores'));
+document.getElementById('cardProveedores').addEventListener('click', ()=> showView('proveedores'));
+document.getElementById('btnLogoutSin').addEventListener('click', async ()=>{ await sb.auth.signOut(); location.reload(); });
+document.getElementById('btnLogoutProv').addEventListener('click', async ()=>{ await sb.auth.signOut(); location.reload(); });
 
 /* ======================= DATA ======================= */
 async function loadAll(){
@@ -557,10 +614,13 @@ function renderPersonas(){
   document.getElementById('personaDetalleLista').classList.add('hidden');
   document.getElementById('quickListWrap').classList.add('hidden');
   document.getElementById('tableWrapNormal').classList.remove('hidden');
+  document.getElementById('catPanels').classList.remove('hidden');
+  document.getElementById('tab-empresas').classList.add('hidden');
   document.getElementById('tab-listado').classList.remove('hidden');
   document.getElementById('tab-dash').classList.add('hidden');
   document.getElementById('tabBtnListado').classList.add('active');
   document.getElementById('tabBtnDash').classList.remove('active');
+  document.getElementById('tabBtnEmpresasCC').classList.remove('active');
   renderCatPanels();
   let list = personasFiltradas().map(p=>{
     const docs = docsDePersona(p.id);
@@ -662,21 +722,21 @@ document.getElementById('fEstadoPersona').addEventListener('change', renderPerso
 document.getElementById('btnVolverPersonas').addEventListener('click', ()=>{ personaActual=null; renderPersonas(); });
 
 /* ======================= DASHBOARD (tortas) ======================= */
-document.getElementById('subtabIngreso').addEventListener('click', ()=>{
-  document.getElementById('submod-ingreso').classList.remove('hidden');
-  document.getElementById('submod-empresas').classList.add('hidden');
-  document.getElementById('subtabIngreso').classList.add('active');
-  document.getElementById('subtabEmpresas').classList.remove('active');
-});
-document.getElementById('subtabEmpresas').addEventListener('click', ()=>{
-  document.getElementById('submod-ingreso').classList.add('hidden');
-  document.getElementById('submod-empresas').classList.remove('hidden');
-  document.getElementById('subtabIngreso').classList.remove('active');
-  document.getElementById('subtabEmpresas').classList.add('active');
-});
-
 document.getElementById('tabBtnListado').addEventListener('click', renderPersonas);
 document.getElementById('tabBtnDash').addEventListener('click', renderDashboard);
+document.getElementById('tabBtnEmpresasCC').addEventListener('click', ()=>{
+  document.getElementById('personaDetalleLista').classList.add('hidden');
+  document.getElementById('quickListWrap').classList.add('hidden');
+  document.getElementById('tableWrapNormal').classList.add('hidden');
+  document.getElementById('emptyMsg').classList.add('hidden');
+  document.getElementById('tab-listado').classList.add('hidden');
+  document.getElementById('tab-dash').classList.add('hidden');
+  document.getElementById('catPanels').classList.add('hidden');
+  document.getElementById('tab-empresas').classList.remove('hidden');
+  document.getElementById('tabBtnListado').classList.remove('active');
+  document.getElementById('tabBtnDash').classList.remove('active');
+  document.getElementById('tabBtnEmpresasCC').classList.add('active');
+});
 
 function conicPie(segments){
   // segments: [{value, color}]
@@ -694,10 +754,13 @@ function conicPie(segments){
 
 function renderDashboard(){
   document.getElementById('personaDetalleLista').classList.add('hidden');
+  document.getElementById('catPanels').classList.remove('hidden');
+  document.getElementById('tab-empresas').classList.add('hidden');
   document.getElementById('tab-listado').classList.add('hidden');
   document.getElementById('tab-dash').classList.remove('hidden');
   document.getElementById('tabBtnListado').classList.remove('active');
   document.getElementById('tabBtnDash').classList.add('active');
+  document.getElementById('tabBtnEmpresasCC').classList.remove('active');
 
   const activos = personas.filter(p=>(p.estado||'Activo')==='Activo').length;
   const standby = personas.filter(p=>p.estado==='Standby').length;

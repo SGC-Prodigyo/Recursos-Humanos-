@@ -243,7 +243,6 @@
 
       <div class="tabs">
         <button class="tab-btn active" id="tabBtnListado">Listado</button>
-        <button class="tab-btn" id="tabBtnDash">Dashboard</button>
         <button class="tab-btn" id="tabBtnEmpresasCC">Empresas</button>
       </div>
 
@@ -289,8 +288,6 @@
         </div>
       </div>
       </div>
-
-      <div id="tab-dash" class="hidden"></div>
 
       <div id="personaDetalleLista" class="hidden">
         <button class="btn" id="btnVolverPersonas">← Volver a personas</button>
@@ -531,18 +528,24 @@ function renderQuickList(cat, est){
       if(!tipoIds.includes(d.tipo_documento_id)) return;
       if(venceInfo(d).estado !== est) return;
       const tipo = tiposDocumento.find(t=>t.id===d.tipo_documento_id);
-      filas.push({ nombre: p.nombre, tipo: tipo?tipo.nombre:'—', fecha: d.fecha_vencimiento });
+      filas.push({ personaId: p.id, nombre: p.nombre, tipo: tipo?tipo.nombre:'—', fecha: d.fecha_vencimiento });
     });
   });
   filas.sort((a,b)=> (a.fecha||'').localeCompare(b.fecha||''));
 
   const tbody = document.getElementById('quickListTbody');
   tbody.innerHTML = filas.length ? filas.map(f=>`
-    <tr>
+    <tr data-persona="${f.personaId}" style="cursor:pointer;">
       <td><b>${escapeHtml(f.nombre)}</b></td>
       <td>${escapeHtml(f.tipo)}</td>
       <td><span class="estado-pill ${estCls}">${formatDate(f.fecha)}</span></td>
     </tr>`).join('') : `<tr><td colspan="3" style="color:var(--ink-soft);text-align:center;padding:20px;">Sin resultados.</td></tr>`;
+  tbody.querySelectorAll('tr[data-persona]').forEach(tr=>{
+    tr.addEventListener('click', ()=>{
+      document.getElementById('quickListWrap').classList.add('hidden');
+      abrirPersona(tr.dataset.persona);
+    });
+  });
 }
 document.getElementById('btnVolverQuickList').addEventListener('click', ()=>{
   document.getElementById('quickListWrap').classList.add('hidden');
@@ -555,6 +558,7 @@ function renderCatPanels(){
   const activasIds = personas.filter(p=>(p.estado||'Activo')==='Activo').map(p=>p.id);
   const docsActivos = documentos.filter(d=>activasIds.includes(d.persona_id) && !d.no_aplica && d.fecha_vencimiento);
   const categorias = ['Examen','Capacitación','EPP','Curso'];
+  const catTitulos = { 'Examen':'Exámenes médicos', 'Capacitación':'Capacitaciones', 'EPP':'EPP', 'Curso':'Cursos' };
 
   el.innerHTML = categorias.map(cat=>{
     const tipoIds = tiposDocumento.filter(t=>t.categoria===cat).map(t=>t.id);
@@ -565,7 +569,7 @@ function renderCatPanels(){
     const isActive = (est) => currentFilter.quick===`cat::${cat}::${est}`;
     return `
       <div class="cat-panel">
-        <h4>${escapeHtml(cat)}</h4>
+        <h4>${escapeHtml(catTitulos[cat]||cat)}</h4>
         <div class="cat-nums">
           <div class="cat-num cat-vigente${isActive('vigente')?' cat-num-active':''}" data-cat="${escapeHtml(cat)}" data-est="vigente"><div class="cn">${vigente}</div><div class="cl">Al día</div></div>
           <div class="cat-num cat-porvencer${isActive('porvencer')?' cat-num-active':''}" data-cat="${escapeHtml(cat)}" data-est="porvencer"><div class="cn">${porvencer}</div><div class="cl">Por vencer</div></div>
@@ -617,9 +621,7 @@ function renderPersonas(){
   document.getElementById('catPanels').classList.remove('hidden');
   document.getElementById('tab-empresas').classList.add('hidden');
   document.getElementById('tab-listado').classList.remove('hidden');
-  document.getElementById('tab-dash').classList.add('hidden');
   document.getElementById('tabBtnListado').classList.add('active');
-  document.getElementById('tabBtnDash').classList.remove('active');
   document.getElementById('tabBtnEmpresasCC').classList.remove('active');
   renderCatPanels();
   let list = personasFiltradas().map(p=>{
@@ -721,116 +723,19 @@ document.getElementById('fBuscar').addEventListener('input', e=>{ currentFilter.
 document.getElementById('fEstadoPersona').addEventListener('change', renderPersonas);
 document.getElementById('btnVolverPersonas').addEventListener('click', ()=>{ personaActual=null; renderPersonas(); });
 
-/* ======================= DASHBOARD (tortas) ======================= */
 document.getElementById('tabBtnListado').addEventListener('click', renderPersonas);
-document.getElementById('tabBtnDash').addEventListener('click', renderDashboard);
 document.getElementById('tabBtnEmpresasCC').addEventListener('click', ()=>{
   document.getElementById('personaDetalleLista').classList.add('hidden');
   document.getElementById('quickListWrap').classList.add('hidden');
   document.getElementById('tableWrapNormal').classList.add('hidden');
   document.getElementById('emptyMsg').classList.add('hidden');
   document.getElementById('tab-listado').classList.add('hidden');
-  document.getElementById('tab-dash').classList.add('hidden');
   document.getElementById('catPanels').classList.add('hidden');
   document.getElementById('tab-empresas').classList.remove('hidden');
   document.getElementById('tabBtnListado').classList.remove('active');
-  document.getElementById('tabBtnDash').classList.remove('active');
   document.getElementById('tabBtnEmpresasCC').classList.add('active');
 });
 
-function conicPie(segments){
-  // segments: [{value, color}]
-  const total = segments.reduce((s,x)=>s+x.value,0) || 1;
-  let acc = 0;
-  const parts = segments.filter(s=>s.value>0).map(s=>{
-    const start = (acc/total)*360;
-    acc += s.value;
-    const end = (acc/total)*360;
-    return `${s.color} ${start}deg ${end}deg`;
-  });
-  if(parts.length===0) return '#E5EAF0';
-  return `conic-gradient(${parts.join(', ')})`;
-}
-
-function renderDashboard(){
-  document.getElementById('personaDetalleLista').classList.add('hidden');
-  document.getElementById('catPanels').classList.remove('hidden');
-  document.getElementById('tab-empresas').classList.add('hidden');
-  document.getElementById('tab-listado').classList.add('hidden');
-  document.getElementById('tab-dash').classList.remove('hidden');
-  document.getElementById('tabBtnListado').classList.remove('active');
-  document.getElementById('tabBtnDash').classList.add('active');
-  document.getElementById('tabBtnEmpresasCC').classList.remove('active');
-
-  const activos = personas.filter(p=>(p.estado||'Activo')==='Activo').length;
-  const standby = personas.filter(p=>p.estado==='Standby').length;
-  const bajas = personas.filter(p=>p.estado==='Baja').length;
-  const totalPersonas = personas.length || 1;
-
-  const vencidos = documentos.filter(d=>venceInfo(d).estado==='vencido').length;
-  const porVencer = documentos.filter(d=>venceInfo(d).estado==='porvencer').length;
-  const vigentes = documentos.filter(d=>venceInfo(d).estado==='vigente').length;
-  const totalDocs = (vencidos+porVencer+vigentes) || 1;
-
-  const pieA = conicPie([{value:activos, color:'var(--verde)'},{value:standby, color:'var(--amarillo)'},{value:bajas, color:'#B9C2CC'}]);
-  const pieB = conicPie([{value:vencidos, color:'var(--rojo)'},{value:porVencer, color:'var(--amarillo)'},{value:vigentes, color:'var(--verde)'}]);
-
-  const sectores = [...new Set(personas.filter(p=>(p.estado||'Activo')==='Activo').map(p=>p.sector||'Sin sector'))].sort();
-  const porSector = sectores.map(sec=>{
-    const idsSector = personas.filter(p=>(p.estado||'Activo')==='Activo' && (p.sector||'Sin sector')===sec).map(p=>p.id);
-    const docsSector = documentos.filter(d=>idsSector.includes(d.persona_id) && !d.no_aplica && d.fecha_vencimiento);
-    const v = docsSector.filter(d=>venceInfo(d).estado==='vencido').length;
-    const pv = docsSector.filter(d=>venceInfo(d).estado==='porvencer').length;
-    const vg = docsSector.filter(d=>venceInfo(d).estado==='vigente').length;
-    const tot = (v+pv+vg) || 1;
-    return { sec, v, pv, vg, tot };
-  });
-
-  const el = document.getElementById('tab-dash');
-  const sectorPies = porSector.map(s=>{
-    const pie = conicPie([{value:s.vg, color:'var(--verde)'},{value:s.pv, color:'var(--amarillo)'},{value:s.v, color:'var(--rojo)'}]);
-    return `
-      <div class="dash-card">
-        <h3>${escapeHtml(s.sec)}</h3>
-        <div class="pie-wrap">
-          <div class="pie" style="background:${pie};"></div>
-          <div class="pie-legend">
-            <div class="row"><span class="sw" style="background:var(--verde);"></span> Vigentes <span class="val">${s.vg} (${Math.round(s.vg/s.tot*100)}%)</span></div>
-            <div class="row"><span class="sw" style="background:var(--amarillo);"></span> Por vencer <span class="val">${s.pv} (${Math.round(s.pv/s.tot*100)}%)</span></div>
-            <div class="row"><span class="sw" style="background:var(--rojo);"></span> Vencidos <span class="val">${s.v} (${Math.round(s.v/s.tot*100)}%)</span></div>
-          </div>
-        </div>
-      </div>`;
-  }).join('');
-
-  el.innerHTML = `
-    <div class="dash-grid">
-      <div class="dash-card">
-        <h3>Personas: Activas, Standby y Bajas</h3>
-        <div class="pie-wrap">
-          <div class="pie" style="background:${pieA};"></div>
-          <div class="pie-legend">
-            <div class="row"><span class="sw" style="background:var(--verde);"></span> Activas <span class="val">${activos} (${Math.round(activos/totalPersonas*100)}%)</span></div>
-            <div class="row"><span class="sw" style="background:var(--amarillo);"></span> Standby <span class="val">${standby} (${Math.round(standby/totalPersonas*100)}%)</span></div>
-            <div class="row"><span class="sw" style="background:#B9C2CC;"></span> Dadas de baja <span class="val">${bajas} (${Math.round(bajas/totalPersonas*100)}%)</span></div>
-          </div>
-        </div>
-      </div>
-      <div class="dash-card">
-        <h3>Documentos: Vencidos, por vencer y vigentes</h3>
-        <div class="pie-wrap">
-          <div class="pie" style="background:${pieB};"></div>
-          <div class="pie-legend">
-            <div class="row"><span class="sw" style="background:var(--rojo);"></span> Vencidos <span class="val">${vencidos} (${Math.round(vencidos/totalDocs*100)}%)</span></div>
-            <div class="row"><span class="sw" style="background:var(--amarillo);"></span> Por vencer <span class="val">${porVencer} (${Math.round(porVencer/totalDocs*100)}%)</span></div>
-            <div class="row"><span class="sw" style="background:var(--verde);"></span> Vigentes <span class="val">${vigentes} (${Math.round(vigentes/totalDocs*100)}%)</span></div>
-          </div>
-        </div>
-      </div>
-      ${sectorPies}
-    </div>
-  `;
-}
 
 function openObsPanel(personaId){
   const p = personas.find(x=>x.id===personaId); if(!p) return;
@@ -874,6 +779,7 @@ function abrirPersona(id){
   personaActual = id;
   const p = personas.find(x=>x.id===id); if(!p) return;
   document.getElementById('tab-listado').classList.add('hidden');
+  document.getElementById('quickListWrap').classList.add('hidden');
   document.getElementById('emptyMsg').classList.add('hidden');
   document.getElementById('personaDetalleLista').classList.remove('hidden');
   const est = p.estado || 'Activo';
